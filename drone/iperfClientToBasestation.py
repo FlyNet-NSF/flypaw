@@ -95,7 +95,7 @@ def daemonize():
 
 if __name__ == '__main__':
   # read the config file which is config.ini
-  configProperties = readConfig("config.ini")
+  configProperties = readConfig("/root/flypaw/drone/config.ini")
   args = handleArguments(configProperties)
   main(args)
   #daemonize()
