@@ -24,7 +24,7 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 			#See: https://iperf3-python.readthedocs.io/en/latest/modules.html#client
 			/iperfClientToBasestation.py
 			#default config file for iperfClientToBasestation.py
-			/config.isi
+			/config.ini
 
 		/scripts
 			/startFlypawIperfClient.sh
