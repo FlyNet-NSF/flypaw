@@ -18,13 +18,17 @@ def main(args):
   
   now = datetime.now()
   current_timestring = now.strftime("%Y%m%d-%H%M%S")
-  output_directory = args.output
-  output_file_name = "flypaw_%s.json" % (current_timestring)
+  output_directory = args.output_directory
+  output_file_name = "iperf3_%s.json" % (current_timestring)
   output_file = output_directory + "/" + output_file_name
 
   basestation_host = args.basestation_host
   basestation_port = args.basestation_port
 
+  if basestation_host is None or basestation_port is None or output_directory is None:
+    print("Please declare config file and/or provide command line arguments properly")
+    sys.exit()
+  
   while True:
     output_json = {}
     client = iperf3.Client()        
@@ -69,7 +73,7 @@ def handleArguments(properties):
                       type=str, help="The host/IP address for the basestation. Default is in the config file.")
   parser.add_argument("-p", "--basestation-port", dest="basestation_port", default=properties['basestation_port'],
                       type=str, help="The iperf3 server port on the basestation RabbitMQ.  Default is in the config file.")
-  parser.add_argument("-o", "--output", dest="output", default=properties['output'],
+  parser.add_argument("-o", "--output-directory", dest="output_directory", default=properties['output_directory'],
                       type=str, help="output directory path for json output")
   return parser.parse_args()
 
@@ -95,7 +99,7 @@ def daemonize():
 
 if __name__ == '__main__':
   # read the config file which is config.ini
-  configProperties = readConfig("/root/flypaw/drone/config.ini")
+  configProperties = readConfig("./config.ini")
   args = handleArguments(configProperties)
   main(args)
   #daemonize()
