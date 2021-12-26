@@ -7,6 +7,7 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 
 
 /drone
+
 	#Base directory for software designed to run on the drone
 	/planfiles
 		#These are .plan files describing flight paths
