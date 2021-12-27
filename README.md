@@ -27,5 +27,5 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 			/config.ini
 
 		/scripts
-			/startFlypawIperfClient.sh
+			/startIperfClient.sh
 				#simple shell script to start and stop iperfClientToBasestation within sample AERPAW experiment framework
