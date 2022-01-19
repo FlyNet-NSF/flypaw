@@ -7,6 +7,7 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 
 
 /drone
+
 	#Base directory for software designed to run on the drone
 	/planfiles
 		#These are .plan files describing flight paths
@@ -23,8 +24,8 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 			#See: https://iperf3-python.readthedocs.io/en/latest/modules.html#client
 			/iperfClientToBasestation.py
 			#default config file for iperfClientToBasestation.py
-			/config.isi
+			/config.ini
 
 		/scripts
-			/startFlypawIperfClient.sh
+			/startIperfClient.sh
 				#simple shell script to start and stop iperfClientToBasestation within sample AERPAW experiment framework
