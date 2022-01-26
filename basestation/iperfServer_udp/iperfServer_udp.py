@@ -27,7 +27,6 @@ def main(args):
   if basestation_port is None or output_directory is None:
     print("Please declare config file and/or provide command line arguments properly")
     sys.exit()
-  
   while True:
     output_json = {}
     server = iperf3.Server()
@@ -43,27 +42,25 @@ def main(args):
       thistime = datetime.now()
       unixsecs = datetime.timestamp(thistime)
       output_json['unixsecs'] = int(unixsecs) 
-      time.sleep(3)
+      time.sleep(1)
     else:
-      print(result.json)
-      #datarate = result.sent_Mbps
-      #retransmits = result.retransmits
-      #unixsecs = result.timesecs
-      #result_json = result.json
-      #meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
-      #output_json['connection'] = 'ok'
-      #output_json['mbps'] = datarate
-      #output_json['retransmits'] = retransmits
-      #output_json['unixsecs'] = unixsecs
-      #output_json['meanrtt'] = meanrtt
-      
-    #result_str = json.dumps(output_json)
-    #with open(output_file, "a") as ofile:
-      #ofile.write(result_str + "\n")
-      
-      #ofile.close()
+      #print(result.json)
+      #print(result.json['intervals'][0]['sum']['bits_per_second'])
+      datarate = result.json['intervals'][0]['sum']['bits_per_second']
+      unixsecs = result.timesecs
+      result_json = result.json
+      output_json['connection'] = 'ok'
+      output_json['mbps'] = datarate
+      output_json['unixsecs'] = unixsecs
+      output_json['jitter_ms'] = result.json['intervals'][0]['sum']['jitter_ms']
+      #print(result.json['intervals'][0]['sum']['bits_per_second'])
+      #print(unixsecs)
+      result_str = json.dumps(output_json)
+      with open(output_file, "a") as ofile:
+        ofile.write(result_str + "\n")
+        ofile.close()
           
-    #del client
+      del server 
 
 def handleArguments(properties):
   parser = ArgumentParser()
