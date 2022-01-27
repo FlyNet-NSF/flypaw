@@ -52,22 +52,23 @@ if __name__=="__main__":
         iperfparse = csv.reader(json_file, delimiter='\n')
         for iperfrun in iperfparse:
             iperfjson = json.loads(iperfrun[0])
+            unixsecs_int = int(iperfjson['unixsecs'])
             if iperfjson['unixsecs'] in timedict:
                 #print(timedict[iperfjson['unixsecs']])
-                timedict[iperfjson['unixsecs']]['mbps_client'] = iperfjson['mbps']
-                timedict[iperfjson['unixsecs']]['jitter_ms_client'] = iperfjson['jitter_ms']
-                timedict[iperfjson['unixsecs']]['connection_client'] = iperfjson['connection']
+                timedict[unixsecs_int]['mbps_client'] = iperfjson['mbps']
+                timedict[unixsecs_int]['jitter_ms_client'] = iperfjson['jitter_ms']
+                timedict[unixsecs_int]['connection_client'] = iperfjson['connection']
         json_file.close()
 
     with open(iperf_server, newline="", mode='r') as json_server_file:
         iperfserverparse = csv.reader(json_server_file, delimiter='\n')
         for iperfserverrun in iperfserverparse:
             iperfserverjson = json.loads(iperfserverrun[0])
-            if iperfserverjson['unixsecs'] in timedict:
-                #print(timedict[iperfjson['unixsecs']])
-                timedict[iperfserverjson['unixsecs']]['mbps_server'] = iperfserverjson['mbps']
-                timedict[iperfserverjson['unixsecs']]['jitter_ms_server'] = iperfserverjson['jitter_ms']
-                timedict[iperfserverjson['unixsecs']]['connection_server'] = iperfserverjson['connection']
+            unixsecs_int = int(iperfserverjson['unixsecs'])
+            if unixsecs_int in timedict:
+                timedict[unixsecs_int]['mbps_server'] = iperfserverjson['mbps']
+                timedict[unixsecs_int]['jitter_ms_server'] = iperfserverjson['jitter_ms']
+                timedict[unixsecs_int]['connection_server'] = iperfserverjson['connection']
         json_file.close()
 
     waypoints = []
