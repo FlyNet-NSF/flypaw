@@ -15,17 +15,17 @@ def readConfig(file):
   return config['properties']
 
 def main(args):
-  
+
   now = datetime.now()
   current_timestring = now.strftime("%Y%m%d-%H%M%S")
   output_directory = args.output_directory
-  output_file_name = "iperf3_%s.json" % (current_timestring)
+  output_file_name = "iperf3_udpclient_%s.json" % (current_timestring)
   output_file = output_directory + "/" + output_file_name
 
   basestation_host = args.basestation_host
   basestation_port = args.basestation_port
 
-  if basestation_host is None or basestation_port is None or output_directory is None:
+  if basestation_host is None or basestation_port is None:
     print("Please declare config file and/or provide command line arguments properly")
     sys.exit()
   
@@ -34,45 +34,42 @@ def main(args):
     client = iperf3.Client()        
     client.server_hostname = basestation_host
     client.port = basestation_port
-    client.duration = 3
+    client.duration = 1
+    client.protocol = 'udp'
+    client.bandwidth = 10000000
     client.json_output = True
     result = client.run()
     err = result.error
     if err is not None:
       output_json['connection'] = err
       output_json['mbps'] = None
-      output_json['retransmits'] = None
-      output_json['meanrtt'] = None
       thistime = datetime.now()
       unixsecs = datetime.timestamp(thistime)
-      output_json['unixsecs'] = int(unixsecs) 
-      time.sleep(3)
+      output_json['unixsecs'] = int(unixsecs)
+      output_json['jitter_ms'] = None
+      time.sleep(1)
     else:
-      datarate = result.sent_Mbps
-      retransmits = result.retransmits
-      unixsecs = result.timesecs
-      result_json = result.json
-      meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
       output_json['connection'] = 'ok'
-      output_json['mbps'] = datarate
-      output_json['retransmits'] = retransmits
+      thistime = datetime.now()
+      unixsecs = datetime.timestamp(thistime)
       output_json['unixsecs'] = unixsecs
-      output_json['meanrtt'] = meanrtt
+      output_json['mbps'] = result.json['intervals'][0]['sum']['bits_per_second']
+      output_json['jitter_ms'] = result.json['end']['sum']['jitter_ms']
+      #time.sleep(3)
+    del client
       
     result_str = json.dumps(output_json)
     with open(output_file, "a") as ofile:
-      ofile.write(result_str + "\n")
-      
+      ofile.write(result_str + "\n")     
       ofile.close()
-          
-    del client
-
+      
+    
 def handleArguments(properties):
   parser = ArgumentParser()
   parser.add_argument("-b", "--basestation-host", dest="basestation_host", default=properties['basestation_host'],
                       type=str, help="The host/IP address for the basestation. Default is in the config file.")
   parser.add_argument("-p", "--basestation-port", dest="basestation_port", default=properties['basestation_port'],
-                      type=str, help="The iperf3 server port on the basestation RabbitMQ.  Default is in the config file.")
+                      type=str, help="The iperf3 server port on the basestation.  Default is in the config file.")
   parser.add_argument("-o", "--output-directory", dest="output_directory", default=properties['output_directory'],
                       type=str, help="output directory path for json output")
   return parser.parse_args()
