@@ -14,7 +14,7 @@ from argparse import ArgumentParser
 from os import path
 #from geopy.distance import lonlat, distance, Distance
 #from geopy import Point
-#from geographiclib.geodesic import Geodesic
+from geographiclib.geodesic import Geodesic
 from distutils.util import strtobool
 
 # constants
@@ -30,20 +30,53 @@ def main(args):
   #baseconnection = pika.BlockingConnection(pika.ConnectionParameters(host=args.basestation_host, virtual_host=args.basestation_vhost, credentials=credentials))
   #basechannel = baseconnection.channel()
   #basechannel.queue_declare(queue=args.basestation_queue, durable=True)
-
+  frameRate = 25 #units fps, placeholder for camera
   vehicle_log = args.vehicle_log
   #print (vehicle_log)
   currentPosition = getCurrentPosition(vehicle_log)
-  previousPosition = None
-  if currentPosition is not None:
+  previousPosition = currentPosition
+  while True: 
+    if currentPosition is None:
+      time.sleep(3)
+      currentPosition = getCurrentPosition(vehicle_log)
+      continue
+    if previousPosition is None:
+      previousPosition = currentPosition
+      #print("initial point found")
+      continue
+    
     print (currentPosition)
+    currentLat = currentPosition['lat']
+    currentLon = currentPosition['lon']
+    currentAlt = currentPosition['alt']
+    currentTime = currentPosition['time']
+    currentTimeTZ = currentTime + "-05:00"  #temporary hack for EST
+    currentTimeDate = datetime.fromisoformat(currentTimeTZ)
+    currentTimeSeconds = currentTimeDate.timestamp()
+    #print(currentTimeDate.timestamp())
+
+    displacement = getDisplacement(previousPosition, currentPosition)
+    #print(displacement['distance'])
+    #print(displacement['bearing'])
+    #print(displacement['interval'])
+
+    if float(displacement['distance']) > 0:
+      traffic = getCurrentTraffic(args.traffic_log)
+      trafficTimeOffset = float(traffic['unixsecs']) - currentTimeSeconds
+      print("last known bandwidth: " + str(traffic['mbps']) + " mbps")
+      #print(traffic['retransmits'])
+      #print(traffic['unixsecs'])
+      #print(trafficTimeOffset)
+    
+      framesCollected = int(frameRate * displacement['interval'])
+      idealFrameSize = (displacement['interval'] * traffic['mbps'])/framesCollected # units: (seconds * mbps) / frames -> mb/frame
+      print("framesCollected: " + str(framesCollected))
+      print("idealFrameSize: " + str(idealFrameSize) + " mb")
+    
+      
     previousPosition = currentPosition
-  
-  #currentLat = currentPosition['lat']
-  #currentLon = currentPosition['lon']
-  #currentAlt = currentPosition['alt']
-  
-  
+    currentPosition = getCurrentPosition(vehicle_log)
+    time.sleep(3)
   #endLat = 33.0
   #endLon = -97.2
   #currentTuple = [currentLon, currentLat, currentAlt]
@@ -200,17 +233,53 @@ def main(args):
   sys.exit()
 
 #def 
+def getDisplacement(startPosition, endPosition):
+  print (startPosition['lat'])
+  print( endPosition['lat'])
+  print(startPosition['lon'])
+  print(endPosition['lon'])
+  analysis = Geodesic.WGS84.Inverse(float(startPosition['lat']), float(startPosition['lon']), float(endPosition['lat']), float(endPosition['lon']))
+  bearing = analysis['azi1']                                                                                                                                                   
+  distance = analysis['s12']
+  startTime = startPosition['time']
+  startTimeTZ = startTime + "-05:00"
+  startTimeDate = datetime.fromisoformat(startTimeTZ)
+  startSecs = startTimeDate.timestamp()
+  endTime = endPosition['time']
+  endTimeTZ = endTime + "-05:00"
+  endTimeDate = datetime.fromisoformat(endTimeTZ)
+  endSecs = endTimeDate.timestamp()
+  interval = endSecs - startSecs
+  displacement = {}
+  displacement['distance'] = distance
+  displacement['bearing'] = bearing
+  displacement['interval'] = interval
+  return displacement
+
+def getLastLine(logfile):
+  with open(logfile, 'rb') as lfile:
+    try:
+      lfile.seek(-2, os.SEEK_END)
+      while lfile.read(1) != b'\n':
+        lfile.seek(-2, os.SEEK_CUR)
+    except OSError:
+      lfile.seek(0)
+    lline = lfile.readline().decode()
+    lfile.close()
+    return lline
+  
+def getCurrentTraffic(trafficLog):
+  tline = getLastLine(trafficLog)
+  if tline is not None and tline is not '\n':
+    print(tline)
+    tobj = json.loads(tline)
+    return tobj
+  else:
+    return None
+  
 def getCurrentPosition(vehicleLog):
   currentPosition = {}
-  with open(vehicleLog, 'rb') as vfile:
-    try:
-      vfile.seek(-2, os.SEEK_END)
-      while vfile.read(1) != b'\n':
-        vfile.seek(-2, os.SEEK_CUR)
-    except OSError:
-      vfile.seek(0)
-    vline = vfile.readline().decode()
-    vfile.close()
+  vline = getLastLine(vehicleLog)
   if vline is not None and vline is not '\n':
     print(vline)
     vlinearr = vline.split(',')
@@ -341,8 +410,8 @@ def handleArguments(properties):
                           type=str, help="The basestation RabbitMQ queue name.  Default is in the config file.")
   parser.add_argument("-e", "--basestation-exchange", dest="basestation_exchange", default=properties['basestation_exchange'],
                           type=str, help="The basestation RabbitMQ exchange name.  Default is in the config file.")
-  parser.add_argument("-n", "--noisy", dest="noisy", action='store_true',
-                      help="Enable noisy output.")
+  parser.add_argument("-t", "--traffic-log", dest="traffic_log", default=properties['traffic_log'],
+                      type=str, help="The traffic log file. Default is in the config file.")
   parser.add_argument("-l", "--vehicle-log", dest="vehicle_log", default=properties['vehicle_log'],
                       type=str, help="The vehicle log file.  Default is in the config file.")
   return parser.parse_args()
