@@ -46,12 +46,15 @@ if __name__=="__main__":
             height = row[3]
             timestamp = row[5]
             dtspl = timestamp.split('.', 1)
-            thisdt = datetime.fromisoformat(dtspl[0])
+            thisdtstr = dtspl[0] + "-05:00"
+            thisdt = datetime.fromisoformat(thisdtstr)
             unixtime = int(thisdt.timestamp())
             timedict[unixtime] = {'lat': lat, 'lon': lon, 'height': height}
             timelist.append(unixtime)
-
+            print(unixtime)
+            
         csv_file.close()
+
     
     with open(iperf, newline="", mode='r') as json_file:
         iperfparse = csv.reader(json_file, delimiter='\n')
