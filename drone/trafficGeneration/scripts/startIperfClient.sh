@@ -19,4 +19,4 @@ done
 pushd /root/flypaw/drone/trafficGeneration/iperfClientToBasestation
 
 screen -S iperfclient -dm \
-       bash -c "python3 /root/flypaw/drone/iperfClientToBasestation.py -b ${DESTINATION_IP} -p 5201 -o ${RESULTS_DIR}"
+       bash -c "python3 /root/flypaw/drone/trafficGeneration/iperfClientToBasestation/iperfClientToBasestation.py -b ${DESTINATION_IP} -p 5201 -o ${RESULTS_DIR}"
