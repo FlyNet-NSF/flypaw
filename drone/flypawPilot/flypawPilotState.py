@@ -7,6 +7,8 @@ import os
 import iperf3
 import socket
 import pickle
+import uuid
+import select
 #import pika                                                                                                                                                               
 import threading
 import random
@@ -19,12 +21,14 @@ from geographiclib.geodesic import Geodesic
 from datetime import datetime
 from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_background, timed_state
 from aerpawlib.util import VectorNED
+#from aerpawlib.vehicle import Vehicle
 from aerpawlib.vehicle import Drone
 
 #class FlyPawPilot(BasicRunner):
 class FlyPawPilot(StateMachine):
     currentPosition = None
     currentBattery = None
+    #currentAttitude = None
     currentHeading = None
     currentHome = None
     currentIperfObj = None
@@ -32,16 +36,12 @@ class FlyPawPilot(StateMachine):
     #@entrypoint
     @state(name="preflight", first=True)
     async def preflight(self, drone: Drone):
-        
-        
+                
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
+        #self.currentAttitude = getCurrentAttitude(drone)
         self.currentHeading = drone.heading
         self.currentHome = drone.home_coords
-        print(self.currentPosition['time'])
-        print(self.currentBattery['level'])
-        print(self.currentHeading)
-        print("home: " + str(self.currentHome.lat) + " , " + str(self.currentHome.lon) + " , " + str(self.currentHome.alt))
         
         #take off to 30m
         #await drone.takeoff(10)
@@ -60,40 +60,86 @@ class FlyPawPilot(StateMachine):
     async def flight(self, drone: Drone):
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
+        #self.currentAttitude = getCurrentAttitude(drone) #may or may not be available
         self.currentHeading = drone.heading
-        print(self.currentPosition['time'])
-        print(self.currentBattery['level'])
-        print(self.currentHeading)
         return "reportPositionUDP" 
         #return "iperf"
 
     @state(name="reportPositionUDP")
     async def reportPositionUDP(self, drone: Drone):
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        x = uuid.uuid4()
         msg = {}
-        msg['position'] = (self.currentPosition['lat'], self.currentPosition['lon'], self.currentPosition['alt'], self.currentPosition['time'])
-        msg['battery'] = (self.currentBattery['voltage'], self.currentBattery['current'], self.currentBattery['level'])
-        msg['heading'] = self.currentHeading
-        msg['home'] = (self.currentHome.lat, self.currentHome.lon, self.currentHome.alt)
-        serialMsg = pickle.dumps(msg)
+        msg['uuid'] = str(x)
+        msg['type'] = "telemetry"
+        msg['telemetry'] = {}
+        msg['telemetry']['position'] = []
+        msg['telemetry']['position'].append(self.currentPosition['lat'])
+        msg['telemetry']['position'].append(self.currentPosition['lon'])
+        msg['telemetry']['position'].append(self.currentPosition['alt'])
+        msg['telemetry']['position'].append(self.currentPosition['time'])
+        msg['telemetry']['gps'] = {}
+        msg['telemetry']['gps']['fix'] = self.currentPosition['fix']
+        msg['telemetry']['gps']['fix_type'] = self.currentPosition['fix_type']
+        msg['telemetry']['battery'] = {}
+        msg['telemetry']['battery']['voltage'] = self.currentBattery['voltage']
+        msg['telemetry']['battery']['current'] = self.currentBattery['current']
+        msg['telemetry']['battery']['level'] = self.currentBattery['level']
+        #msg['telemetry']['attitude'] = {}
+        #msg['telemetry']['attitude']['pitch'] = self.currentAttitude['pitch']
+        #msg['telemetry']['attitude']['yaw'] = self.currentAttitude['yaw']
+        #msg['telemetry']['attitude']['roll'] = self.currentAttitude['roll']
+        msg['telemetry']['heading'] = self.currentHeading
+        #msg['telemetry']['
+        msg['telemetry']['home'] = []
+        msg['telemetry']['home'].append(self.currentHome.lat)
+        msg['telemetry']['home'].append(self.currentHome.lon)
+        msg['telemetry']['home'].append(self.currentHome.alt)
 
-        #make this dynamic
-        serverLoc = ("192.168.116.2", 20001)
-        chunkSize = 1024
-        UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
-        UDPClientSocket.sendto(serialMsg, serverLoc)
-        serialMsgFromServer = UDPClientSocket.recvfrom(chunkSize)
-        server_msg = pickle.loads(serialMsgFromServer[0])
-        "Message from Server {}".format(server_msg)
-        print(msg)
+        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        if serverReply is not None:
+            #print(serverReply)
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                nextSequence = "instructionRequest"
+            else:
+                print("we have a mismatch in uuids... investigate")
+                
+        return nextSequence
 
-        return "iperf"
-
-
-
-
+    @state(name="instructionRequest")
+    async def instructionRequest(self, drone: Drone):
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "instructionRequest"
+        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                theseRequests = serverReply['requests']
+                #just handle the first request now
+                thisPrimaryRequest = theseRequests[0]
+                requestIsValid = validateRequest(thisPrimaryRequest)
+                if requestIsValid:
+                    print("performing request: " + thisPrimaryRequest)
+                    nextSequence = thisPrimaryRequest
+        return nextSequence
+    
     @timed_state(name="iperf",duration = 2)
     async def iperf(self, drone: Drone):
-        output_json = {}
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "iperfResults"
+        msg['iperfResults'] = {}
         client = iperf3.Client()
         client.server_hostname = "192.168.116.2"
         client.port = 5201
@@ -102,38 +148,56 @@ class FlyPawPilot(StateMachine):
         result = client.run()
         err = result.error
         if err is not None:
-            output_json['connection'] = err
-            output_json['mbps'] = None
-            output_json['retransmits'] = None
-            output_json['meanrtt'] = None
+            msg['iperfResults']['connection'] = err
+            msg['iperfResults']['mbps'] = None
+            msg['iperfResults']['retransmits'] = None
+            msg['iperfResults']['meanrtt'] = None
             thistime = datetime.now()
             unixsecs = datetime.timestamp(thistime)
-            output_json['unixsecs'] = int(unixsecs)
+            msg['iperfResults']['unixsecs'] = int(unixsecs)
         else:
             datarate = result.sent_Mbps
             retransmits = result.retransmits
             unixsecs = result.timesecs
             result_json = result.json
             meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
-            output_json['connection'] = 'ok'
-            output_json['mbps'] = datarate
-            output_json['retransmits'] = retransmits
-            output_json['unixsecs'] = unixsecs
-            output_json['meanrtt'] = meanrtt
+            msg['iperfResults']['connection'] = 'ok'
+            msg['iperfResults']['mbps'] = datarate
+            msg['iperfResults']['retransmits'] = retransmits
+            msg['iperfResults']['unixsecs'] = unixsecs
+            msg['iperfResults']['meanrtt'] = meanrtt
 
-        self.currentIperfObj = output_json
-        #print(output_json['mbps'])
-        if (output_json['mbps'] == None):
+        self.currentIperfObj = msg['iperfResults']
+        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                nextSequence = "instructionRequest"
+        #print(msg['iperfResults']['mbps'])
+        if (msg['iperfResults']['mbps'] == None):
             print("no connection, continue")
-            return "flight"
-        else:
-            return "videoanalysis"
+        
+        return nextSequence
 
-    @state(name="videoanalysis")
-    async def videoanalysis(self, _ ):
-        print("videoanalysis")
-        print(self.currentIperfObj['mbps'])
-        return "flight"
+    @state(name="videoAnalysis")
+    async def videoAnalysis(self, _ ):
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "videoAnalysis"
+        msg['videoAnalysis'] = {}
+        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                nextSequence = "instructionRequest"
+
+        print("videoAnalysis")
+        return nextSequence
     
             
 
@@ -162,4 +226,56 @@ def getCurrentBattery(drone: Drone):
         return currentBattery
     else:
         return None
+
+#def getCurrentAttitude(vehicle: Vehicle):
+    #function does not work
+    #Vehicle in aerpawlib needs to be updated
+    #    if drone.connected:
+#        attitude = drone.Attitude
+#        currentAttitude = {}
+#        currentAttitude['pitch'] = attitude[0]
+#        currentAttitude['yaw'] = attitude[1]
+#        currentAttitude['roll'] = attitude[2]
+#        return currentAttitude
+#    else:
+#        return None
+
+def validateRequest(request):
+    if request == "iperf":
+        return 1
+    elif request == "flight":
+        return 1
+    elif request == "reportPositionUDP":
+        return 1
+    elif request == "videoAnalysis":
+        return 1
+    else:
+        return 0
     
+def udpClientMsg(msg, address, port):
+    try:
+        serialMsg = pickle.dumps(msg)
+        serverLoc = (address, port)
+        chunkSize = 1024
+        timeout_in_seconds = 1
+        UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        UDPClientSocket.sendto(serialMsg, serverLoc)
+        UDPClientSocket.setblocking(0)
+        readiness = select.select([UDPClientSocket], [], [], timeout_in_seconds)
+        if readiness[0]:
+            serialMsgFromServer = UDPClientSocket.recvfrom(chunkSize)
+            try:
+                server_msg = pickle.loads(serialMsgFromServer[0])
+                "Reply from Server {}".format(server_msg)
+                print(server_msg)
+                return server_msg
+            except pickle.UnpicklingError as upe:
+                print("bad response from server: " + upe)
+                return None
+        else:
+            print("timeout")
+            return None
+    except pickle.PicklingError as pe:
+        print("could not encode data")
+        return None
+        
