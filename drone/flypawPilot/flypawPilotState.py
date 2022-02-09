@@ -5,6 +5,8 @@ import time
 import sys
 import os
 import iperf3
+import socket
+import pickle
 #import pika                                                                                                                                                               
 import threading
 import random
@@ -24,20 +26,27 @@ class FlyPawPilot(StateMachine):
     currentPosition = None
     currentBattery = None
     currentHeading = None
+    currentHome = None
     currentIperfObj = None
+    
     #@entrypoint
     @state(name="preflight", first=True)
     async def preflight(self, drone: Drone):
+        
+        
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
         self.currentHeading = drone.heading
+        self.currentHome = drone.home_coords
         print(self.currentPosition['time'])
         print(self.currentBattery['level'])
         print(self.currentHeading)
+        print("home: " + str(self.currentHome.lat) + " , " + str(self.currentHome.lon) + " , " + str(self.currentHome.alt))
+        
         #take off to 30m
         #await drone.takeoff(10)
         return "flight"
-        #take off to 30m
+    
         #await drone.takeoff(10)
 
         # fly north 10m
@@ -55,7 +64,32 @@ class FlyPawPilot(StateMachine):
         print(self.currentPosition['time'])
         print(self.currentBattery['level'])
         print(self.currentHeading)
+        return "reportPositionUDP" 
+        #return "iperf"
+
+    @state(name="reportPositionUDP")
+    async def reportPositionUDP(self, drone: Drone):
+        msg = {}
+        msg['position'] = (self.currentPosition['lat'], self.currentPosition['lon'], self.currentPosition['alt'], self.currentPosition['time'])
+        msg['battery'] = (self.currentBattery['voltage'], self.currentBattery['current'], self.currentBattery['level'])
+        msg['heading'] = self.currentHeading
+        msg['home'] = (self.currentHome.lat, self.currentHome.lon, self.currentHome.alt)
+        serialMsg = pickle.dumps(msg)
+
+        #make this dynamic
+        serverLoc = ("192.168.116.2", 20001)
+        chunkSize = 1024
+        UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        UDPClientSocket.sendto(serialMsg, serverLoc)
+        serialMsgFromServer = UDPClientSocket.recvfrom(chunkSize)
+        server_msg = pickle.loads(serialMsgFromServer[0])
+        "Message from Server {}".format(server_msg)
+        print(msg)
+
         return "iperf"
+
+
+
 
     @timed_state(name="iperf",duration = 2)
     async def iperf(self, drone: Drone):
