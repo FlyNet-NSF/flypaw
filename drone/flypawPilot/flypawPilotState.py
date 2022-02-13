@@ -32,6 +32,8 @@ class FlyPawPilot(StateMachine):
     currentHeading = None
     currentHome = None
     currentIperfObj = None
+
+    videoLocation = getVideoLocation()
     
     #@entrypoint
     @state(name="preflight", first=True)
@@ -122,15 +124,33 @@ class FlyPawPilot(StateMachine):
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
                 print(serverReply['type_received'] + " receipt confirmed by UUID")
-                theseRequests = serverReply['requests']
-                #just handle the first request now
-                thisPrimaryRequest = theseRequests[0]
-                requestIsValid = validateRequest(thisPrimaryRequest)
-                if requestIsValid:
-                    print("performing request: " + thisPrimaryRequest)
-                    nextSequence = thisPrimaryRequest
-        return nextSequence
-    
+                if 'requests' in serverReply:
+                    theseRequests = serverReply['requests']
+                    #just handle the first request for now
+                    if serverReply['requests'] is not None:
+                        thisPrimaryRequest = theseRequests[0]
+                        if 'command' in thisPrimaryRequest:
+                            requestIsValid = validateRequest(thisPrimaryRequest['command'])
+                            if requestIsValid:
+                                print("performing request: " + thisPrimaryRequest['command'])
+                                nextSequence = thisPrimaryRequest['command']
+                                return nextSequence
+        #if for any reason you asked for a request and didn't get one or got a bad one, we're on our own for now
+        #implement safety checks
+        #check how far we are from the home location
+        #implement me
+        #estimate how much battery it will take to get there
+        #implement me
+        #reqBatteryToGetHome = 30
+        #if currentBattery['level'] < reqBatteryToGetHome:
+        #look for new home within range... if none available, head toward home and prepare for crash landing
+        #elif currentBattery['level'] >= reqBatteryToGetHome and currentBattery['level'] < reqBatteryToGetHome + 10:
+        #look for new home or go home
+        #else:
+        #proceed
+        #return "flight"
+        
+        
     @timed_state(name="iperf",duration = 2)
     async def iperf(self, drone: Drone):
         defaultSequence = "flight"
@@ -180,15 +200,24 @@ class FlyPawPilot(StateMachine):
         
         return nextSequence
 
-    @state(name="videoAnalysis")
-    async def videoAnalysis(self, _ ):
+    @state(name="sendVideo")
+    async def sendVideo(self, _ ):
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        
+        x = uuid.uuid4()
+        msg = {}
+        
+    
+    @state(name="collectVideo")
+    async def collectVideo(self, _ ):
         defaultSequence = "flight"
         nextSequence = defaultSequence
         x = uuid.uuid4()
         msg = {}
         msg['uuid'] = str(x)
-        msg['type'] = "videoAnalysis"
-        msg['videoAnalysis'] = {}
+        msg['type'] = "collectVideo"
+        msg['collectVideo'] = {}
         serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
         if serverReply is not None:
             print(serverReply['uuid_received'])
@@ -196,7 +225,7 @@ class FlyPawPilot(StateMachine):
                 print(serverReply['type_received'] + " receipt confirmed by UUID")
                 nextSequence = "instructionRequest"
 
-        print("videoAnalysis")
+        print("collectVideo")
         return nextSequence
     
             
@@ -240,15 +269,24 @@ def getCurrentBattery(drone: Drone):
 #    else:
 #        return None
 
+def getVideoLocation():
+    #check on the specific camera software configuration
+    #maybe add a camera argument
+    #or just hardcode for now:
+    videoLocation = "/opt/video/"
+    return videoLocation
+    
+    
 def validateRequest(request):
-    if request == "iperf":
-        return 1
-    elif request == "flight":
-        return 1
-    elif request == "reportPositionUDP":
-        return 1
-    elif request == "videoAnalysis":
-        return 1
+    validReq = []
+    validReq.append("iperf")
+    validReq.append("flight")
+    validReq.append("sendVideo")
+    validReq.append("collectVideo")
+    validReq.append("instructionRequest")
+
+    if request in validReq:
+        return 1    
     else:
         return 0
     
