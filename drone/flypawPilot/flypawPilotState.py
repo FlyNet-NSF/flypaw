@@ -90,7 +90,7 @@ class FlyPawPilot(StateMachine):
         self.currentIperfObj = None
 
         ##brief system status check
-        if self.currentBattery.level < 0:
+        if self.currentBattery.level < 0: #testing at zero... normally this should be 10 or > 2x distance to first waypoint estimate at minimum
             print("low battery! Only " + str(self.currentBattery.level) + "% charged")
             sys.exit()
         if self.currentPosition.lat is None or self.currentPosition.lon is None:
@@ -106,15 +106,21 @@ class FlyPawPilot(StateMachine):
         #likely a lot more to check... punt for now
         
         for mission in self.missions:            
-            print("mission: " + mission['missionType'] + " leader: " + mission['missionLeader'] + " priority: " + str(mission['priority']))
-                  
-        sys.exit()
+            print("mission: " + mission['missionType'] + " leader: " + mission['missionLeader'] + " priority: " + str(mission['priority'] ))
+            
+            for waypoint in mission['default_waypoints']:
+                print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2])) 
+        #sys.exit()
+        
+        currentMission = self.missions[0] #for now focus on a single mission
+
+        #ok here we actually implement flying
+        #but we'll test passively with the autopilot in the background initially
+        return "flight"
+
         #take off to 30m
         #await drone.takeoff(10)
-        return "flight"
-    
-        #await drone.takeoff(10)
-
+        
         # fly north 10m
         #await drone.goto_coordinates(drone.position + VectorNED(10, 0))
 
@@ -125,12 +131,26 @@ class FlyPawPilot(StateMachine):
     @state(name="flight")
     async def flight(self, drone: Drone):
         print ("flight")
+        #ok here we actually implement flying                                                                                       
+        #but we'll test passively with the autopilot in the background initially
+        #take off to 30m                                                                                                                                              
+        #await drone.takeoff(10)                                                                                                                                      
+        # fly north 10m                                                                                                                                               
+        #await drone.goto_coordinates(drone.position + VectorNED(10, 0))                                                                                              
+        # land                                                                                                                                                        
+        #await drone.land()
+        
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
         #self.currentAttitude = getCurrentAttitude(drone) #may or may not be available
         self.currentHeading = drone.heading
-        return "reportPositionUDP" 
-        #return "iperf"
+        if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":   
+            print("report position to basestation")
+            return "reportPositionUDP"
+        else:
+            print("consider position implications")
+            #return "considerPosition"
+            return "flight" #for now
 
     @state(name="reportPositionUDP")
     async def reportPositionUDP(self, drone: Drone):
@@ -143,17 +163,17 @@ class FlyPawPilot(StateMachine):
         msg['type'] = "telemetry"
         msg['telemetry'] = {}
         msg['telemetry']['position'] = []
-        msg['telemetry']['position'].append(self.currentPosition['lat'])
-        msg['telemetry']['position'].append(self.currentPosition['lon'])
-        msg['telemetry']['position'].append(self.currentPosition['alt'])
-        msg['telemetry']['position'].append(self.currentPosition['time'])
+        msg['telemetry']['position'].append(self.currentPosition.lat)
+        msg['telemetry']['position'].append(self.currentPosition.lon)
+        msg['telemetry']['position'].append(self.currentPosition.alt)
+        msg['telemetry']['position'].append(self.currentPosition.time)
         msg['telemetry']['gps'] = {}
-        msg['telemetry']['gps']['fix'] = self.currentPosition['fix']
-        msg['telemetry']['gps']['fix_type'] = self.currentPosition['fix_type']
+        msg['telemetry']['gps']['fix'] = self.currentPosition.fix
+        msg['telemetry']['gps']['fix_type'] = self.currentPosition.fix_type
         msg['telemetry']['battery'] = {}
-        msg['telemetry']['battery']['voltage'] = self.currentBattery['voltage']
-        msg['telemetry']['battery']['current'] = self.currentBattery['current']
-        msg['telemetry']['battery']['level'] = self.currentBattery['level']
+        msg['telemetry']['battery']['voltage'] = self.currentBattery.voltage
+        msg['telemetry']['battery']['current'] = self.currentBattery.current
+        msg['telemetry']['battery']['level'] = self.currentBattery.level
         #msg['telemetry']['attitude'] = {}
         #msg['telemetry']['attitude']['pitch'] = self.currentAttitude['pitch']
         #msg['telemetry']['attitude']['yaw'] = self.currentAttitude['yaw']
