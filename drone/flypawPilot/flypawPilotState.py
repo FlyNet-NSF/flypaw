@@ -22,29 +22,93 @@ from datetime import datetime
 from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_background, timed_state
 from aerpawlib.util import VectorNED
 #from aerpawlib.vehicle import Vehicle
-from aerpawlib.vehicle import Drone
+from aerpawlib.vehicle import Drone 
 
+class Position(object):
+    """
+    lon: float units degrees (-180..180)
+    lat: float units degrees (-90..90)
+    alt: float units M AGL
+    time: str, iso8601 currently 
+    fix: int (?), gps ...
+    fix_type: int (?), gps ...
+    """
+    def __init__(self):
+        self.lon = float
+        self.lat = float
+        self.alt = float
+        self.time = str 
+        self.fix = int
+        self.fix_type = int
+
+class Battery(object):
+    """
+    voltage: float units V
+    current: float units mA
+    level: int unitless (0-100)
+    m_kg: battery mass, units kg
+    """
+    def __init__(self):
+        self.voltage = float
+        self.current = float
+        self.level = float
+        self.m_kg = float 
+
+
+class missionInfo(object):
+    def __init__(self):
+        self.defaultWaypoints = [] #planfile  
+        self.missionType = str #videography, delivery, air taxi, etc.
+        self.missionLeader = str #basestation, drone, cloud, edge device(s)
+        self.priority = float #normalized float from 0-1
+        
 #class FlyPawPilot(BasicRunner):
 class FlyPawPilot(StateMachine):
-    currentPosition = None
-    currentBattery = None
-    #currentAttitude = None
-    currentHeading = None
-    currentHome = None
-    currentIperfObj = None
-
-    videoLocation = getVideoLocation()
+    
+    def __init__(self):
+        self.currentPosition = None
+        self.currentBattery = None
+        self.currentHeading = None
+        self.currentHome = None
+        self.missions = []
+        #self.missionstate = "preflight"
+        self.currentIperfObj = None
     
     #@entrypoint
     @state(name="preflight", first=True)
-    async def preflight(self, drone: Drone):
-                
+    async def preflight(self, drone=Drone):
+        """
+        our real init
+        """
+        print ("preflight")
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
-        #self.currentAttitude = getCurrentAttitude(drone)
         self.currentHeading = drone.heading
         self.currentHome = drone.home_coords
+        self.missions = getMissions()
+        #self.missionstate = "preflight"
+        self.currentIperfObj = None
+
+        ##brief system status check
+        if self.currentBattery.level < 0:
+            print("low battery! Only " + str(self.currentBattery.level) + "% charged")
+            sys.exit()
+        if self.currentPosition.lat is None or self.currentPosition.lon is None:
+            print("No GPS reading!")
+            sys.exit()
+        if self.currentHome is None:
+            print("Please ensure home position is set properly")
+            sys.exit()
+        if not self.missions:
+            print("No assignment... will check again in 10 seconds")
+            time.sleep(10)
+            return "preflight"
+        #likely a lot more to check... punt for now
         
+        for mission in self.missions:            
+            print("mission: " + mission['missionType'] + " leader: " + mission['missionLeader'] + " priority: " + str(mission['priority']))
+                  
+        sys.exit()
         #take off to 30m
         #await drone.takeoff(10)
         return "flight"
@@ -60,6 +124,7 @@ class FlyPawPilot(StateMachine):
 
     @state(name="flight")
     async def flight(self, drone: Drone):
+        print ("flight")
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
         #self.currentAttitude = getCurrentAttitude(drone) #may or may not be available
@@ -69,6 +134,7 @@ class FlyPawPilot(StateMachine):
 
     @state(name="reportPositionUDP")
     async def reportPositionUDP(self, drone: Drone):
+        print ("reportPositionUDP")
         defaultSequence = "flight"
         nextSequence = defaultSequence
         x = uuid.uuid4()
@@ -113,6 +179,7 @@ class FlyPawPilot(StateMachine):
 
     @state(name="instructionRequest")
     async def instructionRequest(self, drone: Drone):
+        print("instructionRequest")
         defaultSequence = "flight"
         nextSequence = defaultSequence
         x = uuid.uuid4()
@@ -153,6 +220,7 @@ class FlyPawPilot(StateMachine):
         
     @timed_state(name="iperf",duration = 2)
     async def iperf(self, drone: Drone):
+        print("iperf")
         defaultSequence = "flight"
         nextSequence = defaultSequence
         x = uuid.uuid4()
@@ -202,15 +270,26 @@ class FlyPawPilot(StateMachine):
 
     @state(name="sendVideo")
     async def sendVideo(self, _ ):
+        print("sendVideo")
         defaultSequence = "flight"
         nextSequence = defaultSequence
-        
         x = uuid.uuid4()
         msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "sendVideo"
+        msg['collectVideo'] = {}
+        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                nextSequence = "instructionRequest"
+        print("sendVideo")
+        return nextSequence
         
-    
     @state(name="collectVideo")
     async def collectVideo(self, _ ):
+        print("collectVideo")
         defaultSequence = "flight"
         nextSequence = defaultSequence
         x = uuid.uuid4()
@@ -227,32 +306,46 @@ class FlyPawPilot(StateMachine):
 
         print("collectVideo")
         return nextSequence
-    
-            
+                
+
+def getMissions():
+    x = uuid.uuid4()
+    msg = {}
+    msg['uuid'] = str(x)
+    msg['type'] = "mission"
+    serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+    if serverReply is not None:
+        print(serverReply['uuid_received'])
+        if serverReply['uuid_received'] == str(x):
+            print(serverReply['type_received'] + " receipt confirmed by UUID")
+            if 'missions' in serverReply:
+                missions = serverReply['missions']
+                return missions
+    return None
 
 def getCurrentPosition(drone: Drone):
     if drone.connected:
         pos = drone.position
         gps = drone.gps
-        currentPosition = {}
-        currentPosition['lat'] = pos.lat
-        currentPosition['lon'] = pos.lon
-        currentPosition['alt'] = pos.alt
-        currentPosition['time'] = datetime.now().astimezone().isoformat()
-        currentPosition['fix'] = gps.fix_type
-        currentPosition['fix_type'] = gps.satellites_visible
-        return currentPosition
+        thisPosition = Position()
+        thisPosition.lat = pos.lat
+        thisPosition.lon = pos.lon
+        thisPosition.alt = pos.alt
+        thisPosition.time = datetime.now().astimezone().isoformat()
+        thisPosition.fix = gps.fix_type
+        thisPosition.fix_type = gps.satellites_visible
+        return thisPosition
     else:
         return None
     
 def getCurrentBattery(drone: Drone):
     if drone.connected:
         battery = drone.battery
-        currentBattery = {}
-        currentBattery['voltage'] = battery.voltage
-        currentBattery['current'] = battery.current
-        currentBattery['level'] = battery.level
-        return currentBattery
+        thisBattery = Battery()
+        thisBattery.voltage = battery.voltage
+        thisBattery.current = battery.current
+        thisBattery.level = battery.level
+        return thisBattery
     else:
         return None
 
