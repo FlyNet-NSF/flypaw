@@ -6,6 +6,53 @@ import sys
 #import aerpawlib
 from datetime import datetime
 
+def getPlanFromPlanfile(filepath):
+    f = open(filepath)
+    pathdata = json.load(f)
+    f.close()
+    return pathdata
+
+def processPlan(plan):
+    processedPlan = {}
+    default_waypoints = []
+    if not 'mission' in plan:
+        print("No mission in planfile")
+        return None
+    if not 'plannedHomePosition' in plan['mission']:
+        print("No planned home position")
+        return None
+    php = plan['mission']['plannedHomePosition']
+
+    thisWaypoint = [php[1],php[0],0]
+    default_waypoints.append(thisWaypoint)
+    lastWaypoint = thisWaypoint
+    if not 'items' in plan['mission']:
+        print("No items")
+        return None
+    theseItems = plan['mission']['items']
+    for thisItem in theseItems:
+        if 'autocontinue' in thisItem:
+            if thisItem['autocontinue'] == True:
+                print ("ignore autocontinue")
+                thisWaypoint = [php[1],php[0],lastWaypoint[2]]
+                processedPlan['default_waypoints'] = default_waypoints
+                thisWaypoint = [php[1],php[0],0]
+                default_waypoints.append(thisWaypoint)
+        if 'params' in thisItem:
+            if not len(thisItem['params']) == 7:
+                print("incorrect number of params")
+            else:
+                thisWaypoint = [thisItem['params'][5], thisItem['params'][4], thisItem['params'][6]]
+                if thisWaypoint[0] == 0:
+                    thisWaypoint[0] = lastWaypoint[0]
+                if thisWaypoint[1] == 0:
+                    thisWaypoint[1] = lastWaypoint[1]
+                default_waypoints.append(thisWaypoint)
+                lastWaypoint = thisWaypoint
+
+    processedPlan['default_waypoints'] = default_waypoints
+    return processedPlan
+
 class IperfInfo(object):
     def __init__(self, ipaddr="192.168.126.2", port=5201, protocol="tcp", priority=0, mbps=0, rtt=0):
         self.ipaddr = ipaddr #string server ip address
@@ -90,9 +137,11 @@ class FlyPawBasestationAgent(object):
         mission.missionType = "videography"
         mission.missionLeader = "basestation"
         mission.priority = 1
-        mission.planfile = "./mission.plan"
-        mission.default_waypoints = getWaypointsFromPlanfile()
-        #mission.default_waypoints = []
+        mission.planfile = "./plans/mission.plan"
+        mission.default_waypoints = []
+        plan = getPlanFromPlanfile(mission.planfile)
+        processedPlan = processPlan(plan)
+        mission.default_waypoints = processedPlan['default_waypoints']
         self.missions.append({'missionType': mission.missionType, 'missionLeader': mission.missionLeader, 'default_waypoints': mission.default_waypoints, 'priority': mission.priority})
         
     def basestationDispatch(self):
@@ -149,7 +198,3 @@ class FlyPawBasestationAgent(object):
 if __name__ == '__main__':
     FPBA = FlyPawBasestationAgent()
     FPBA.basestationDispatch()
-
-
-def getWaypointsFromPlanfile(filepath):
-    
