@@ -84,6 +84,9 @@ class FlyPawPilot(StateMachine):
         our real init
         """
         print ("preflight")
+        #certain failures cause preflight to restart so let's sleep for 5 seconds upon entry
+        time.sleep(5)
+        
         self.missionstate = "preflight"
         """
         Position Check
@@ -134,8 +137,9 @@ class FlyPawPilot(StateMachine):
         """
         Airspace Check
         TBD--> A placeholder for future important concepts like weather checks and UVRs.  Traffic also checked with DCB later
+        For now just use the first mission
         """
-        if not checkAirspace(mission['default_waypoints']):
+        if not checkAirspace(self.missions[0]['default_waypoints']):
             print("Airspace not fit for flying, check back later")
             return "preflight"
 
@@ -143,7 +147,7 @@ class FlyPawPilot(StateMachine):
         Equipment Check
         TBD--> Mission specific gear check.  Eg. Video mission should check camera status
         """
-        if not checkEquipment(mission):
+        if not checkEquipment(self.missions[0]):
             print("Equipment not reporting correctly.  Please check")
             return "preflight"
 
@@ -151,7 +155,7 @@ class FlyPawPilot(StateMachine):
         Cloud Resources Check
         TBD--> Mission specific cloud resources are queried for availability... not yet reserved
         """
-        if not cloudResourcesCheck(mission):
+        if not checkCloudResources(self.missions[0]):
             print("Required cloud resources do not appear to be available")
             return "preflight"
 
@@ -159,7 +163,7 @@ class FlyPawPilot(StateMachine):
         Edge Resources Check
         TBD--> Mission specific edge resources are queried for availability... not yet reserved
         """
-        if not edgeResourcesCheck(mission):
+        if not checkEdgeResources(self.missions[0]):
             print("Required edge resources do not appear to be available")
             return "preflight"
         
@@ -169,54 +173,55 @@ class FlyPawPilot(StateMachine):
         self.previousSelfs = []
         self.previousSelfs.append(self)
         #we can only keep track for so long else risk filling up memory... unclear how long this array can be
-        if len(self.previousSelfs > 10000):
+        if len(self.previousSelfs) > 10000:
             self.previousSelfs.pop(0)
         
         #likely a lot more to check... 
 
         #print out missions
         for mission in self.missions:            
-            print("mission: " + mission['missionType'] + " leader: " + mission['missionLeader'] + " priority: " + str(mission['priority'] ))
+            print("mission: " + self.missions[0]['missionType'] + " leader: " + self.missions[0]['missionLeader'] + " priority: " + str(self.missions[0]['priority'] ))
             #print out waypoints
-            for waypoint in mission['default_waypoints']:
+            for waypoint in self.missions[0]['default_waypoints']:
                 print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2])) 
 
         #ok, try to accept mission
-        missionAccepted = acceptMission(self.mission)
+        missionAccepted = acceptMission(self.missions[0])
         if missionAccepted:
-            print self.missionType + " mission accepted"
+            print (self.missionType + " mission accepted")
             #check start time of mission
             #check current time
             #sleep diff
 
             #get your initial waypoint in the default waypoints before we take off
-            initial_waypoint_location = LocationGlobalRelative(mission['default_waypoints'][0][1], mission['default_waypoints'][0][0], mission['default_waypoints'][0][2])
+            initial_waypoint_location = LocationGlobalRelative(self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], self.missions[0]['default_waypoints'][0][2])
 
             #arm vehicle and lift off to arg[0] meters
             #from dronekit (see function), argument altitude m?
-            arm_and_takeoff(30, drone: Drone)
+            arm_and_takeoff(30, drone)
             
             #get the latest battery after takeoff
             self.currentBattery = getCurrentBattery(drone)
 
             #check if we have enough to go, at minimum, from here to the next waypoint, to home
-            battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, mission['default_waypoints'][0])
+            battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0]['default_waypoints'][0])
             if not battery_check:
-		print "battery check fail"
-		return "abortmission"
+                print("battery check fail")
+                return "abortmission"
+            
             
             print ("go to " + initial_waypoint_location)
             drone.simple_goto(initial_waypoint_location, airspeed=5)
             while True:
                 #perform mission stuff like iperf eventually, but here just track your progress
                 self.currentPosition = getCurrentPosition(drone)
-                geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, mission['default_waypoints'][0][1], mission['default_waypoints'][0][0], 1025)
+                geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], 1025)
                 flight_dx_from_here = geodesic_dx.get('s12')
                 #get within 5 meters? 
                 if flight_dx_from_here < 5:
                     print("arrived at initial waypoint")
                     break
-                sleep 1
+                time.sleep(1)
             
                     
             #alternatively:
@@ -224,14 +229,14 @@ class FlyPawPilot(StateMachine):
             
             return "flight"
         else:
-            print "Mission canceled"
+            print("Mission canceled")
             return "preflight"
     
         
     @state(name="flight")
     async def flight(self, drone: Drone):
         print ("flight")
-
+        sys.exit()
         # fly north 10m
         #await drone.goto_coordinates(drone.position + VectorNED(10, 0))
         # land
@@ -244,7 +249,7 @@ class FlyPawPilot(StateMachine):
         self.currentHeading = drone.heading
 
         #make an immediate plan
-        a_location = LocationGlobalRelative(-34.364114, 149.166022, 30)
+        #a_location = LocationGlobalRelative(-34.364114, 149.166022, 30)
         
         #if there is a mission leader besides the drone itself, report to them
         if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":   
@@ -273,7 +278,7 @@ class FlyPawPilot(StateMachine):
         msg = {}
         msg['uuid'] = str(x)
         msg['type'] = "instructionRequest"
-        serverReply = udpClientMsg(msg, "192.168.116.2", 20001, 1)
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
         if serverReply is not None:
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
@@ -315,7 +320,7 @@ class FlyPawPilot(StateMachine):
         msg['type'] = "iperfResults"
         msg['iperfResults'] = {}
         client = iperf3.Client()
-        client.server_hostname = "192.168.116.2"
+        client.server_hostname = "172.16.0.1"
         client.port = 5201
         client.duration = 1
         client.json_output = True
@@ -347,7 +352,7 @@ class FlyPawPilot(StateMachine):
             msg['iperfResults']['meanrtt'] = meanrtt
 
         self.currentIperfObj = msg['iperfResults']
-        serverReply = udpClientMsg(msg, "192.168.116.2", 20001, 2)
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 2)
         if serverReply is not None:
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
@@ -366,7 +371,7 @@ class FlyPawPilot(StateMachine):
         msg['uuid'] = str(x)
         msg['type'] = "sendVideo"
         msg['collectVideo'] = {}
-        serverReply = udpClientMsg(msg, "192.168.116.2", 20001, 1)
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
         if serverReply is not None:
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
@@ -385,7 +390,7 @@ class FlyPawPilot(StateMachine):
         msg['uuid'] = str(x)
         msg['type'] = "collectVideo"
         msg['collectVideo'] = {}
-        serverReply = udpClientMsg(msg, "192.168.116.2", 20001, 1)
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
         if serverReply is not None:
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
@@ -426,7 +431,7 @@ class FlyPawPilot(StateMachine):
         msg['telemetry']['home'].append(self.currentHome.lon)
         msg['telemetry']['home'].append(self.currentHome.alt)
         
-        serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
         if serverReply is not None:
             #print(serverReply) 
             print(serverReply['uuid_received'])
@@ -443,7 +448,7 @@ def getMissions():
     msg = {}
     msg['uuid'] = str(x)
     msg['type'] = "mission"
-    serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+    serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
     if serverReply is not None:
         print(serverReply['uuid_received'])
         if serverReply['uuid_received'] == str(x):
@@ -514,6 +519,9 @@ def validateRequest(request):
         return 0
 
 def checkPosition(thisPosition):
+    #print(thisPosition.lat)
+    #print(thisPosition.lon)
+    #sys.exit()
     if thisPosition.lat is None or thisPosition.lon is None:
         print("Unable to query current latitude and/or longitude coordinates!")
         return 0
@@ -604,13 +612,14 @@ def acceptMission(thismission):
     msg = {}
     msg['uuid'] = str(x)
     msg['type'] = "acceptMission"
-    serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+    serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
     if serverReply is not None:
         print(serverReply['uuid_received'])
         if serverReply['uuid_received'] == str(x):
             print(serverReply['type_received'] + " receipt confirmed by UUID")
             if 'missionstatus' in serverReply:
-	        thisMissionStatus = serverReply['missionstatus']
+                thisMissionStatus = serverReply['missionstatus']
+                
                 if thisMissionStatus == "canceled":
                     return 0
                 elif thisMissionStatus == "confirmed":
@@ -626,33 +635,33 @@ def arm_and_takeoff(aTargetAltitude, drone):
     from https://dronekit-python.readthedocs.io/en/latest/guide/taking_off.html
     """
 
-    print "Basic pre-arm checks"
+    print("Basic pre-arm checks")
     # Don't try to arm until autopilot is ready
     while not drone.is_armable:
-        print " Waiting for drone to initialise..."
+        print("Waiting for drone to initialize...")
         time.sleep(1)
 
-    print "Arming motors"
+    print("Arming motors")
     # Copter should arm in GUIDED mode
     drone.mode    = DroneMode("GUIDED")
     drone.armed   = True
 
     # Confirm drone armed before attempting to take off
     while not drone.armed:
-        print " Waiting for arming..."
+        print("Waiting for arming")
         time.sleep(1)
 
-    print "Taking off!"
+    print("Taking off!")
     
     drone.simple_takeoff(aTargetAltitude) # Take off to target altitude
 
     # Wait until the drone reaches a safe height before processing the goto (otherwise the command
     #  after Drone.simple_takeoff will execute immediately).
     while True:
-        print " Altitude: ", drone.location.global_relative_frame.alt
+        print("Altitude: " + str(drone.location.global_relative_frame.alt))
         #Break and return from function just below target altitude.
         if drone.location.global_relative_frame.alt>=aTargetAltitude*0.95:
-            print "Reached target altitude"
+            print("Reached target altitude")
             break
         time.sleep(1)
     
