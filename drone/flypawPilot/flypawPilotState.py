@@ -70,8 +70,9 @@ class FlyPawPilot(StateMachine):
         self.currentBattery = None
         self.currentHeading = None
         self.currentHome = None
+        self.previousSelfs = [] 
         self.missions = []
-        #self.missionstate = "preflight"
+        self.missionstate = None
         self.currentIperfObj = None
     
     #@entrypoint
@@ -81,66 +82,140 @@ class FlyPawPilot(StateMachine):
         our real init
         """
         print ("preflight")
+        self.missionstate = "preflight"
+        """
+        Position Check
+        """
         self.currentPosition = getCurrentPosition(drone)
-        self.currentBattery = getCurrentBattery(drone)
-        self.currentHeading = drone.heading
-        self.currentHome = drone.home_coords
-        self.missions = getMissions()
-        #self.missionstate = "preflight"
-        self.currentIperfObj = None
+        if not checkPosition(self.currentPosition):
+            print("Position reporting not available.  Please resolve.")
+            return "preflight"
 
-        ##brief system status check
-        if self.currentBattery.level < 0: #testing at zero... normally this should be 10 or > 2x distance to first waypoint estimate at minimum
-            print("low battery! Only " + str(self.currentBattery.level) + "% charged")
-            sys.exit()
-        if self.currentPosition.lat is None or self.currentPosition.lon is None:
-            print("No GPS reading!")
-            sys.exit()
-        if self.currentHome is None:
-            print("Please ensure home position is set properly")
-            sys.exit()
+        """
+        Battery Check
+        """
+        self.currentBattery = getCurrentBattery(drone)
+        if not checkBattery(self.currentBattery):
+            print("Battery needs charging or reporting incorrectly.  Please resolve.")
+            return "preflight"
+
+        """
+        Heading Check
+        TBD--> Make sure it makes sense and is a number I suppose
+        """
+        self.currentHeading = drone.heading
+
+        """
+        Mission Check
+        TBD--> develop high level mission overview checks
+        """
+        self.missions = getMissions() #should probably include the position and battery and home info when asking for missions... may preclude some missions
         if not self.missions:
             print("No assignment... will check again in 10 seconds")
             time.sleep(10)
             return "preflight"
-        #likely a lot more to check... punt for now
+
+        """
+        Home Check
+        TBD--> compare it to your current location I suppose and guess if it's possible                                                                       """
+        self.currentHome = drone.home_coords
+        if self.currentHome is None:
+            print("Please ensure home position is set properly")
+            return "preflight"
+
+        """
+        Network Check
+        TBD--> Maybe check your throughput from that pad, or make it a networking system test (UE) rather than iperf
+        for now punt
+        """
+        self.currentIperfObj = None
+
+        """
+        Airspace Check
+        TBD--> A placeholder for future important concepts like weather checks and UVRs.  Traffic also checked with DCB later
+        for now punt
+        """
+        if not checkAirspace(mission['default_waypoints']):
+            print("Airspace not fit for flying, check back later")
+            return "preflight"
+
+        """
+        Equipment Check
+        TBD--> Mission specific gear check.  Eg. Video mission should check camera status
+        for now punt
+        """
+        if not checkEquipment(mission):
+            print("Equipment not reporting correctly.  Please check")
+            return "preflight"
+
+        """
+        Cloud Resources Check
+        TBD--> Mission specific cloud resources are queried for availability... not yet reserved
+        for now punt
+        """
+        if not cloudResourcesCheck(mission):
+            print("Required cloud resources do not appear to be available")
+            return "preflight"
+
+        """
+        Edge Resources Check
+        TBD--> Mission specific edge resources are queried for availability... not yet reserved
+        for now punt 
+        """
+        if not edgeResourcesCheck(mission):
+            print("Required edge resources do not appear to be available")
+            return "preflight"
         
+        """
+        keep track of previous states
+        """
+        self.previousSelfs = []
+        self.previousSelfs.append(self)
+        #we can only keep track for so long else risk filling up memory... unclear how long this array can be
+        if len(self.previousSelfs > 10000):
+            self.previousSelfs.pop(0)
+        
+        #likely a lot more to check... punt for now
+
+        #print out missions
         for mission in self.missions:            
             print("mission: " + mission['missionType'] + " leader: " + mission['missionLeader'] + " priority: " + str(mission['priority'] ))
-            
+            #print out waypoints
             for waypoint in mission['default_waypoints']:
                 print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2])) 
-        #sys.exit()
-        
-        currentMission = self.missions[0] #for now focus on a single mission
 
-        #ok here we actually implement flying
-        #but we'll test passively with the autopilot in the background initially
-        return "flight"
-
-        #take off to 30m
-        #await drone.takeoff(10)
-        
-        # fly north 10m
-        #await drone.goto_coordinates(drone.position + VectorNED(10, 0))
-
-        # land
-        #await drone.land()
+        #ok, try to accept mission
+        missionAccepted = acceptMission(self.mission)
+        if missionAccepted:
+            print self.missionType + " mission accepted"
+            
+            #arm vehicle here
+            #<armFunction>
+            
+            #initiate takeoff here for now rather than in flight state... probably need an intermediate takeoff state
+            #take off to 30m
+            #await drone.takeoff(10)
+            
+            return "flight"
+        else:
+            print "Mission canceled"
+            return "preflight"
     
-
+        
     @state(name="flight")
     async def flight(self, drone: Drone):
         print ("flight")
-        #ok here we actually implement flying                                                                                       
+        #ok here we actually implement flying some examples below
         #but we'll test passively with the autopilot in the background initially
-        #take off to 30m                                                                                                                                              
-        #await drone.takeoff(10)                                                                                                                                      
-        # fly north 10m                                                                                                                                               
-        #await drone.goto_coordinates(drone.position + VectorNED(10, 0))                                                                                              
-        # land                                                                                                                                                        
+        #take off to 30m
+        #await drone.takeoff(10)
+        # fly north 10m
+        #await drone.goto_coordinates(drone.position + VectorNED(10, 0))
+        # land
         #await drone.land()
         
         self.currentPosition = getCurrentPosition(drone)
+        
         self.currentBattery = getCurrentBattery(drone)
         #self.currentAttitude = getCurrentAttitude(drone) #may or may not be available
         self.currentHeading = drone.heading
@@ -233,9 +308,8 @@ class FlyPawPilot(StateMachine):
         #look for new home within range... if none available, head toward home and prepare for crash landing
         #elif currentBattery['level'] >= reqBatteryToGetHome and currentBattery['level'] < reqBatteryToGetHome + 10:
         #look for new home or go home
-        #else:
-        #proceed
-        #return "flight"
+        else:
+            return next_sequence
         
         
     @timed_state(name="iperf",duration = 2)
@@ -255,6 +329,11 @@ class FlyPawPilot(StateMachine):
         client.json_output = True
         result = client.run()
         err = result.error
+        iperfPosition = getCurrentPosition(drone)
+        msg['iperfResults']['ipaddr'] = client.server_hostname
+        msg['iperfResults']['port'] = client.port
+        msg['iperfResults']['protocol'] = "tcp" #static for now
+        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
         if err is not None:
             msg['iperfResults']['connection'] = err
             msg['iperfResults']['mbps'] = None
@@ -282,9 +361,6 @@ class FlyPawPilot(StateMachine):
             if serverReply['uuid_received'] == str(x):
                 print(serverReply['type_received'] + " receipt confirmed by UUID")
                 nextSequence = "instructionRequest"
-        #print(msg['iperfResults']['mbps'])
-        if (msg['iperfResults']['mbps'] == None):
-            print("no connection, continue")
         
         return nextSequence
 
@@ -402,7 +478,86 @@ def validateRequest(request):
         return 1    
     else:
         return 0
-    
+
+def checkPosition(thisPosition):
+    if thisPosition.lat is None or thisPosition.lon is None:
+        print("No GPS reading!")
+        return 0
+
+    if thisPosition.lat >= -90 and thisPosition.lat <= 90:
+        if thisPosition.lon > -360 and thisPosition.lon < 360:
+            if thisPosition.alt >= 0:
+                #check time
+                #if thisPosition.time 
+                #or don't
+                return 1
+    else:
+        return 0
+
+def checkBattery(thisBattery):
+    if thisBattery.voltage > 0:
+        if thisBattery.level > 10:
+            #check current
+            #if thisBattery.current >= 0:
+            #or don't
+            return 1
+    else:
+        return 0
+
+def checkAirspace(theseWaypoints):
+    """
+    checkAirspace
+    TBD-->check for UVRs primarily
+    punt for now
+    """
+    return 1
+
+def checkEquipment(thismission):
+    """
+    checkEquipment
+    TBD-->check list of gear for thismission, likely stored in an object, and go through it's status check
+    punt for now
+    """
+    return 1
+
+def checkCloudResources(thismission):
+    """
+    checkCloudResources
+    TBD-->first, check to see if the mission object specifies any cloud resources
+    if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
+    punt for now
+    """
+    return 1
+
+def checkEdgeResources(thismission):
+    """      
+    checkCloudResources 
+    TBD-->first, check to see if the mission object specifies any edge resources
+    if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
+    punt for now
+    """
+    return 1
+
+def acceptMission(thismission):
+    x = uuid.uuid4()
+    msg = {}
+    msg['uuid'] = str(x)
+    msg['type'] = "acceptMission"
+    serverReply = udpClientMsg(msg, "192.168.116.2", 20001)
+    if serverReply is not None:
+        print(serverReply['uuid_received'])
+        if serverReply['uuid_received'] == str(x):
+            print(serverReply['type_received'] + " receipt confirmed by UUID")
+            if 'missionstatus' in serverReply:
+	        thisMissionStatus = serverReply['missionstatus']
+                if thisMissionStatus == "canceled":
+                    return 0
+                elif thisMissionStatus == "confirmed":
+                    return 1
+                else:
+                    return 0
+    return 0
+
 def udpClientMsg(msg, address, port):
     try:
         serialMsg = pickle.dumps(msg)
