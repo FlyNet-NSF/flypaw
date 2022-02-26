@@ -20,9 +20,9 @@ from geographiclib.geodesic import Geodesic
 #from distutils.util import strtobool
 from datetime import datetime
 from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_background, timed_state
-from aerpawlib.util import VectorNED
-#from aerpawlib.vehicle import Vehicle
-from aerpawlib.vehicle import Drone 
+from aerpawlib.util import VectorNED, Coordinate 
+from aerpawlib.vehicle import Vehicle
+from aerpawlib.vehicle import Drone
 
 class Position(object):
     """
@@ -75,8 +75,8 @@ class FlyPawPilot(StateMachine):
         self.missionstate = None
         self.currentIperfObj = None
         self.communications = {}
-        self.currentWaypointIndex = None
-        
+        self.currentWaypointIndex = 0
+
     #@entrypoint
     @state(name="preflight", first=True)
     async def preflight(self, drone=Drone):
@@ -84,8 +84,8 @@ class FlyPawPilot(StateMachine):
         our real init
         """
         print ("preflight")
-        #certain failures cause preflight to restart so let's sleep for 5 seconds upon entry
-        time.sleep(5)
+        #certain failures cause preflight to restart so let's sleep for seconds upon entry
+        time.sleep(3)
         
         self.missionstate = "preflight"
         """
@@ -188,45 +188,47 @@ class FlyPawPilot(StateMachine):
         #ok, try to accept mission
         missionAccepted = acceptMission(self.missions[0])
         if missionAccepted:
-            print (self.missionType + " mission accepted")
+            print (self.missions[0]['missionType'] + " mission accepted")
             #check start time of mission
             #check current time
             #sleep diff
 
             #get your initial waypoint in the default waypoints before we take off
-            initial_waypoint_location = LocationGlobalRelative(self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], self.missions[0]['default_waypoints'][0][2])
+            #initial_waypoint_location = dronekit.LocationGlobalRelative(self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], self.missions[0]['default_waypoints'][0][2])
+            
+            #arm vehicle with aerpawlib
+            #if not drone.armed:
+            #    print("drone not armed. Arming")
+            #    await drone.set_armed(True)
+            #    print("arming complete")
+            #else:
+            #    print("drone is already armed")
+            #    await drone.set_armed(False)
+            #    print("no longer armed")
+            #    print("Arming")
+            #    await drone.set_armed(True)
+            #    print("armed")
+                
+            #takeoff to height of the first waypoint or 25 meters, whichever is higher
+            if len(self.missions[0]['default_waypoints']) > 1:
+                target_alt = self.missions[0]['default_waypoints'][1][2]
+            else:
+                print("recheck your mission")
+                return "preflight"
+            
+            #if target_alt < 30:
+            #    target_alt = 30
+                
+            #takeoff
+            #print("takeoff to " + str(target_alt) + "m")
+            #await drone.takeoff(target_alt)
+            await drone.takeoff(30)
+            print("reached " + str(target_alt) + "m")
 
-            #arm vehicle and lift off to arg[0] meters
-            #from dronekit (see function), argument altitude m?
-            arm_and_takeoff(30, drone)
-            
-            #get the latest battery after takeoff
-            self.currentBattery = getCurrentBattery(drone)
+            #you should be at default_waypoints[1] now
+            #with [1] being directly above [0], which is the home position on the ground
+            self.currentWaypointIndex = 1
 
-            #check if we have enough to go, at minimum, from here to the next waypoint, to home
-            battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0]['default_waypoints'][0])
-            if not battery_check:
-                print("battery check fail")
-                return "abortmission"
-            
-            
-            print ("go to " + initial_waypoint_location)
-            drone.simple_goto(initial_waypoint_location, airspeed=5)
-            while True:
-                #perform mission stuff like iperf eventually, but here just track your progress
-                self.currentPosition = getCurrentPosition(drone)
-                geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], 1025)
-                flight_dx_from_here = geodesic_dx.get('s12')
-                #get within 5 meters? 
-                if flight_dx_from_here < 5:
-                    print("arrived at initial waypoint")
-                    break
-                time.sleep(1)
-            
-                    
-            #alternatively:
-            #await drone.takeoff(10)
-            
             return "flight"
         else:
             print("Mission canceled")
@@ -236,12 +238,7 @@ class FlyPawPilot(StateMachine):
     @state(name="flight")
     async def flight(self, drone: Drone):
         print ("flight")
-        sys.exit()
-        # fly north 10m
-        #await drone.goto_coordinates(drone.position + VectorNED(10, 0))
-        # land
-        #await drone.land()
-
+        
         #update position and battery and gps and heading
         self.currentPosition = getCurrentPosition(drone)
         self.currentBattery = getCurrentBattery(drone)
@@ -249,7 +246,17 @@ class FlyPawPilot(StateMachine):
         self.currentHeading = drone.heading
 
         #make an immediate plan
-        #a_location = LocationGlobalRelative(-34.364114, 149.166022, 30)
+        #check if we have enough to go, at minimum, from here to the next default waypoint and to home
+        print ("check battery")
+        if not len(self.missions[0]['default_waypoints']) > (self.currentWaypointIndex + 2):
+            print("flight should be over, check position, go home if not over it already, and execute landing")
+            sys.exit()
+        battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1])
+        if not battery_check:
+            print("battery check fail")
+            return "abortmission"
+        defaultNextCoord = Coordinate(self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][2])
+        
         
         #if there is a mission leader besides the drone itself, report to them
         if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":   
@@ -262,12 +269,26 @@ class FlyPawPilot(StateMachine):
                 return "instructionRequest"
             else:
                 self.communications['reportPositionUDP'] = 0
-                return "flight"
-        else:
-            print("consider mission")
-            #identify where on the default waypoints we are
-            #return "considerPosition"
-            return "flight" #for now
+                
+        print("No comms, going with drone plan")
+        ##set heading... unnecessary unless we want to have a heading other than the direction of motion 
+        #drone.set_heading(bearing_from_here)
+        await drone.goto_coordinates(nextCoord)
+
+        while True:
+            #perform mission stuff like iperf eventually, but here just track your progress                                                                           
+            self.currentPosition = getCurrentPosition(drone)
+            geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], 1025)
+            flight_dx_from_here = geodesic_dx.get('s12')
+            print(str(self.currentPosition.lat) + " " + str(self.currentPosition.lon) + " " + str(self.currentPosition.alt))
+            #get within 5 meters?                                                                                                                                     
+            if flight_dx_from_here < 5:
+                print("arrived at initial waypoint")
+                self.currentWaypointIndex = self.currentWaypointIndex + 1
+                break
+            time.sleep(1)
+        
+        return "flight" 
 
     @state(name="instructionRequest")
     async def instructionRequest(self, drone: Drone):
@@ -567,14 +588,15 @@ def checkBattery(thisBattery, thisPosition, thisHome, destination):
         if (1):
             return 1
 
-    #also the more generic bland battery test option
-    if thisBattery.voltage > 0:
-        if thisBattery.level > 10:
-            #check current
-            #if thisBattery.current >= 0:
-            #or don't
-            return 1
-    
+    #also the more generic checkBattery call with just the battery specified returns a
+    if thisBattery is not None:
+        if thisBattery.voltage > 0:
+            if thisBattery.level > 10:
+                #check current
+                #if thisBattery.current >= 0:
+                #or don't
+                return 1
+            
     return 0
 
 def checkAirspace(theseWaypoints):
@@ -628,43 +650,6 @@ def acceptMission(thismission):
                     return 0
     return 0
 
-
-def arm_and_takeoff(aTargetAltitude, drone):
-    """
-    Arms drone and fly to aTargetAltitude.
-    from https://dronekit-python.readthedocs.io/en/latest/guide/taking_off.html
-    """
-
-    print("Basic pre-arm checks")
-    # Don't try to arm until autopilot is ready
-    while not drone.is_armable:
-        print("Waiting for drone to initialize...")
-        time.sleep(1)
-
-    print("Arming motors")
-    # Copter should arm in GUIDED mode
-    drone.mode    = DroneMode("GUIDED")
-    drone.armed   = True
-
-    # Confirm drone armed before attempting to take off
-    while not drone.armed:
-        print("Waiting for arming")
-        time.sleep(1)
-
-    print("Taking off!")
-    
-    drone.simple_takeoff(aTargetAltitude) # Take off to target altitude
-
-    # Wait until the drone reaches a safe height before processing the goto (otherwise the command
-    #  after Drone.simple_takeoff will execute immediately).
-    while True:
-        print("Altitude: " + str(drone.location.global_relative_frame.alt))
-        #Break and return from function just below target altitude.
-        if drone.location.global_relative_frame.alt>=aTargetAltitude*0.95:
-            print("Reached target altitude")
-            break
-        time.sleep(1)
-    
     
         
 
