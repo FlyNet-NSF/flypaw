@@ -3,6 +3,9 @@ import pickle
 import json
 import sys
 #from aerpawlib.vehicle import Drone
+#from aerpawlib.vehicle import Vehicle
+#import dronekit
+
 #import aerpawlib
 from datetime import datetime
 
@@ -50,18 +53,20 @@ def processPlan(plan):
                 default_waypoints.append(thisWaypoint)
                 lastWaypoint = thisWaypoint
 
+    print (default_waypoints)
     processedPlan['default_waypoints'] = default_waypoints
     return processedPlan
 
 class IperfInfo(object):
-    def __init__(self, ipaddr="192.168.126.2", port=5201, protocol="tcp", priority=0, mbps=0, rtt=0):
+    def __init__(self, ipaddr="172.16.0.1", port=5201, protocol="tcp", priority=0, mbps=0, meanrtt=0):
         self.ipaddr = ipaddr #string server ip address
         self.port = port #string server port address 
         self.protocol = protocol #tcp, udp
         self.priority = 1 #normalized float 0-1         
         self.mbps = mbps #float, units mbps, representing throughput
-        self.rtt = rtt #float, units ms, representing latency
-
+        self.meanrtt = meanrtt #float, units ms, representing latency
+        self.location4d = [float, float, float, str]
+        
 class collectVideoInfo(object):
     def __init__(self, dataformat="jpgframes", duration=5, quality=100, priority = 1):
         self.dataformat = dataformat #jpgframes, ffmpeg, etc
@@ -70,7 +75,7 @@ class collectVideoInfo(object):
         self.priority = priority #normalized float 0-1
 
 class sendVideoInfo(object):
-    def __init__(self, dataformat="jpgframes", ipaddr="192.168.126.2", port="23000", priority=1):
+    def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="23000", priority=1):
         self.dataformat = dataformat #jpgframes, ffmpeg, etc
         self.ipaddr = ipaddr #string ip address
         self.port = port #int port number 
@@ -117,8 +122,9 @@ class VehicleCommands(object):
     def setMissionCommand(self, missionObj):
         self.commands['mission'] = { "command": "mission", "defaultWaypoints": missionObj.defaultWaypoints, "missionType": missionObj.missionType, "missionControl": missionObj.missionControl, "priority": missionObj.priority }
         
+
 class FlyPawBasestationAgent(object):
-    def __init__(self, ipaddr="192.168.116.2", port=20001, chunkSize=1024) :
+    def __init__(self, ipaddr="172.16.0.1", port=20001, chunkSize=1024) :
         self.ipaddr = ipaddr
         self.port = port
         self.chunkSize = chunkSize
@@ -128,6 +134,8 @@ class FlyPawBasestationAgent(object):
         self.flightInfo = flightInfo()
         self.missions = []
         self.currentRequests = []
+        self.iperfHistory = []
+        #self.drone = Drone() #our digital twin
         self.vehicleCommands = VehicleCommands()
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
         self.vehicleCommands.setCollectVideoCommand(self.videoCollectionAgent)
@@ -169,19 +177,37 @@ class FlyPawBasestationAgent(object):
                 msgType = clientMessage['type']
                 msgFromServer['type_received'] = msgType
                 if msgType == "telemetry":
-                    #do something with telemetry
-                    #currentRequests = []
-                    self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default                  
+                    #update your digital twin, update registry, pass on to downstream applications
+                    #handle_telemetry(clientMessage)
+
+                    #set command based on mission
+                    self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default            
+
+                elif msgType == "acceptMission":
+                    #get final approval of DCB
+                    #do any preflight resource reservation with Mobius, etc
+                    #register flight in ACS or wherever
+                    #if all good
+                    msgFromServer['missionstatus'] = "confirmed"
+                    
                 elif msgType == "instructionRequest":
                     msgFromServer['requests'] = self.currentRequests
                     self.currentRequests = []
                 elif msgType == "iperfResults":
+                    self.iperf3Agent.ipaddr = clientMessage[msgType]['ipaddr']
+                    self.iperf3Agent.port = clientMessage[msgType]['port']
+                    self.iperf3Agent.protocol = clientMessage[msgType]['protocol']
                     self.iperf3Agent.mbps = clientMessage[msgType]['mbps']
-                    self.iperf3Agent.rtt = clientMessage[msgType]['meanrtt']
-                    #if latestBW > 10000:
-                    self.currentRequests.append(self.vehicleCommands.commands['sendVideo'])
-                    #else:
-                    #    self.currentRequests.append(self.vehicleCommands['commands']['flight'])                    
+                    self.iperf3Agent.meanrtt = clientMessage[msgType]['meanrtt']
+                    self.iperf3Agent.location4d = clientMessage[msgType]['location4d']
+                    self.iperfHistory.append(self.iperf3Agent)
+                    if self.iperf3Agent.mbps is not None:
+                        if self.iperf3Agent.mbps > 1:
+                            self.currentRequests.append(self.vehicleCommands.commands['sendVideo'])
+                        else:
+                            self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                    else:
+                        self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "sendVideo":
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "mission":
@@ -194,7 +220,48 @@ class FlyPawBasestationAgent(object):
                 
             except pickle.UnpicklingError as upe:
                 print ("cannot decode message from drone: " + upe)
+
+    def handle_telemetry(self, tm):
+        """
+        function to apply to received telemetry message (tm in function call) from drone 
+        update digital twin
+        update registration system
+        pass on to downstream functions
+        """
+        update_digital_twin(tm)
+        #update_acs
+        #maybe send digital twin somewhere in the cloud for sim
         
+        
+    def update_digital_twin(self, msg):
+        """
+        function call to update the digital twin with different types of incoming data
+        """
+        if msg['type'] == "telemetry":
+            print("update twin with telemetry")
+            if msg['telemetry']['position'] is not None:
+                self.drone.position.lat = msg['telemetry']['position'][0]
+                self.drone.position.lon = msg['telemetry']['position'][1]
+                self.drone.position.alt = msg['telemetry']['position'][2]
+                self.drone.position.time = msg['telemetry']['position'][3]
+            if msg['telemetry']['gps'] is not None:
+                self.drone.gps.fix_type = msg['telemetry']['gps']['fix_type']
+                self.drone.gps.satellites_visible = msg['telemetry']['gps']['satellites_visible']
+            if msg['telemetry']['battery'] is not None:
+                self.drone.battery.voltage = msg['telemetry']['battery']['voltage'] 
+                self.drone.battery.current = msg['telemetry']['battery']['current']
+                self.drone.battery.level = msg['telemetry']['battery']['level']
+            #if msg['telemetry']['attitude'] is not None:
+                #self.drone.attitude.pitch = msg['telemetry']['attitude']['pitch']
+                #self.drone.attitude.yaw = msg['telemetry']['attitude']['yaw']
+                #self.drone.attitude.roll = msg['telemetry']['attitude']['roll']
+            if msg['telemetry']['heading'] is not None:
+                self.drone.heading = msg['telemetry']['heading']
+            if msg['telemetry']['home'] is not None:
+                self.drone.home_coords.lat = msg['telemetry']['home'][0]
+                self.drone.home_coords.lon = msg['telemetry']['home'][1]
+                self.drone.home_coords.alt = msg['telemetry']['home'][2]
+            
 if __name__ == '__main__':
     FPBA = FlyPawBasestationAgent()
     FPBA.basestationDispatch()
