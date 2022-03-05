@@ -1,458 +1,863 @@
-#!/usr/bin/python3
 import requests
 import json
 import geojson
 import time
 import sys
 import os
-#import pika
+import iperf3
+import socket
+import pickle
+import uuid
+import select
+#import pika                                                                                                                                                               
 import threading
-import configparser
 import random
-from datetime import datetime
-from argparse import ArgumentParser
-from os import path
-#from geopy.distance import lonlat, distance, Distance
+import dronekit
+#from pymavlink import mavutil
+#from geopy.distance import lonlat, distance, Distance                                                                                                                     
 #from geopy import Point
 from geographiclib.geodesic import Geodesic
-from distutils.util import strtobool
+#from distutils.util import strtobool
+from datetime import datetime
+from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_background, timed_state
+from aerpawlib.util import VectorNED, Coordinate 
+from aerpawlib.vehicle import Vehicle
+from aerpawlib.vehicle import Drone
 
-# constants
-worker_interface = "tun_srsue"
+class Position(object):
+    """
+    lon: float units degrees (-180..180)
+    lat: float units degrees (-90..90)
+    alt: float units M AGL
+    time: str, iso8601 currently 
+    fix_type: int (0..4), 0-1 = no fix, 2 = 2D fix, 3 = 3D fix
+    satellites_visible: int (0..?)
+    """
+    def __init__(self):
+        self.lon = float
+        self.lat = float
+        self.alt = float
+        self.time = str 
+        self.fix_type = int
+        self.satellites_visible = int
 
-def readConfig(file):
-  config = configparser.ConfigParser()
-  config.read(os.path.join(os.path.dirname(__file__), file))
-  return config['properties']
+class Battery(object):
+    """
+    voltage: float units V
+    current: float units mA
+    level: int unitless (0-100)
+    m_kg: battery mass, units kg
+    """
+    def __init__(self):
+        self.voltage = float
+        self.current = float
+        self.level = float
+        self.m_kg = float 
 
-def main(args):
-  #credentials = pika.PlainCredentials(args.rabbituser, args.rabbitpass)
-  #baseconnection = pika.BlockingConnection(pika.ConnectionParameters(host=args.basestation_host, virtual_host=args.basestation_vhost, credentials=credentials))
-  #basechannel = baseconnection.channel()
-  #basechannel.queue_declare(queue=args.basestation_queue, durable=True)
-  frameRate = 25 #units fps, placeholder for camera
-  vehicle_log = args.vehicle_log
-  #print (vehicle_log)
-  currentPosition = getCurrentPosition(vehicle_log)
-  previousPosition = currentPosition
-  while True: 
-    if currentPosition is None:
-      time.sleep(3)
-      currentPosition = getCurrentPosition(vehicle_log)
-      continue
-    if previousPosition is None:
-      previousPosition = currentPosition
-      #print("initial point found")
-      continue
+
+class missionInfo(object):
+    def __init__(self):
+        self.defaultWaypoints = [] #planfile  
+        self.missionType = str #videography, delivery, air taxi, etc.
+        self.missionLeader = str #basestation, drone, cloud, edge device(s)
+        self.priority = float #normalized float from 0-1
+        
+#class FlyPawPilot(BasicRunner):
+class FlyPawPilot(StateMachine):
     
-    print (currentPosition)
-    currentLat = currentPosition['lat']
-    currentLon = currentPosition['lon']
-    currentAlt = currentPosition['alt']
-    currentTime = currentPosition['time']
-    currentTimeTZ = currentTime + "-05:00"  #temporary hack for EST
-    currentTimeDate = datetime.fromisoformat(currentTimeTZ)
-    currentTimeSeconds = currentTimeDate.timestamp()
-    #print(currentTimeDate.timestamp())
+    def __init__(self):
+        self.currentPosition = Position()
+        self.currentBattery = Battery()
+        self.currentHeading = None
+        self.currentHome = None
+        self.previousSelfs = [] 
+        self.missions = []
+        self.missionstate = None
+        self.currentIperfObj = None
+        self.communications = {}
+        self.currentWaypointIndex = 0
+        self.nextStates = []
+        self.logfiles = {}
 
-    displacement = getDisplacement(previousPosition, currentPosition)
-    #print(displacement['distance'])
-    #print(displacement['bearing'])
-    #print(displacement['interval'])
+        now = datetime.now()
+        current_timestring = now.strftime("%Y%m%d-%H%M%S")
+        #output_directory = args.output_directory
+        output_directory = "/root/Results/"
 
-    if float(displacement['distance']) > 0:
-      traffic = getCurrentTraffic(args.traffic_log)
-      trafficTimeOffset = float(traffic['unixsecs']) - currentTimeSeconds
-      print("last known bandwidth: " + str(traffic['mbps']) + " mbps")
-      #print(traffic['retransmits'])
-      #print(traffic['unixsecs'])
-      #print(trafficTimeOffset)
-    
-      framesCollected = int(frameRate * displacement['interval'])
-      idealFrameSize = (displacement['interval'] * traffic['mbps'])/framesCollected # units: (seconds * mbps) / frames -> mb/frame
-      print("framesCollected: " + str(framesCollected))
-      print("idealFrameSize: " + str(idealFrameSize) + " mb")
-    
-      
-    previousPosition = currentPosition
-    currentPosition = getCurrentPosition(vehicle_log)
-    time.sleep(3)
-  #endLat = 33.0
-  #endLon = -97.2
-  #currentTuple = [currentLon, currentLat, currentAlt]
-  #endTuple = [endLon, endLat, currentAlt]
-  #currentBattery = random.randint(50, 100)
-  #currentBattery = 100 
-  #endless = 0
+        #states
+        state_file_name = output_directory + "flypawState_%s.json" % (current_timestring)
+        self.logfiles['state'] = state_file_name
 
-  #drone_flights = [] #in case we want more than one
-  #archived_updates = []
-  #cell_towers = []
-  #ground_stations = []
-  
-  
-  #droneData = {}
-  #droneData['type'] = "Feature"
-  #droneData['properties'] = {}
-  #droneData['properties']['eventName'] = "FlyPawDemo"
-  #droneData['properties']['classification'] = "proposedFlight"
-  #droneData['properties']['userProperties'] = {}
-  #droneData['properties']['userProperties']["cost"] = "cost estimate pending"
+        #telemetry
+        telemetry_file_name = output_directory + "telemetry_%s.json" % (current_timestring)
+        self.logfiles['telemetry'] = telemetry_file_name
+        
+        #iperf
+        iperf_file_name = output_directory + "iperf3_%s.json" % (current_timestring)
+        self.logfiles['iperf'] = iperf_file_name
 
-  #flight_analysis = Geodesic.WGS84.Inverse(currentLat, currentLon, endLat, endLon)
-  #flight_bearing = flight_analysis['azi1']
-  #flight_distance = flight_analysis['s12']
-  #droneData['properties']['userProperties']["distance"] = flight_distance
-  #droneData['properties']['userProperties']["flightType"] = 4 #speed
-  
-  #droneData['properties']['userProperties']['vehicle'] = {}
-  #this_vehicle = getVehicleData(1);
-  #droneData['properties']['userProperties']['vehicle'] = this_vehicle
-  
-  #droneData['properties']['userProperties']['celltowers'] = {}
-  #droneData['properties']['userProperties']['celltowers']['type'] = "FeatureCollection"
-  #droneData['properties']['userProperties']['celltowers']['features']= []
-  #droneData['properties']['userProperties']['groundstations'] = {}
-  #droneData['properties']['userProperties']['groundstations']['type'] = "FeatureCollection"
-  #droneData['properties']['userProperties']['groundstations']['features']= []
-  #droneData['properties']['dynamicProperties'] = {}
-  #droneData['properties']['dynamicProperties']['altitude'] = 500
-  #droneData['properties']['dynamicProperties']['location'] = {}
-  #droneData['properties']['dynamicProperties']['location']['type'] = "Point"
-  #droneData['properties']['dynamicProperties']['location']['coordinates'] = []
-  #droneData['properties']['dynamicProperties']['location']['coordinates'] = currentTuple
-  #droneData['properties']['dynamicProperties']['bearing'] = flight_bearing
-  #droneData['properties']['dynamicProperties']['archivedUpdates'] = []
-  #droneData['geometry'] = {}
-  #droneData['geometry']['type'] = "LineString"
-  #droneData['geometry']['coordinates'] = []
-  #droneData['geometry']['coordinates'].append(currentTuple)
-  #droneData['geometry']['coordinates'].append(endTuple)
-  
-  #while currentBattery > 0:
-  #  print("currentBattery: " + str(currentBattery))
-    # update drone data
-    #droneData['properties']['userProperties']['batterylife'] = currentBattery
+        
+        
+        #"waypoint_entry" #default
+        
+    #@entrypoint
+    @state(name="preflight", first=True)
+    async def preflight(self, drone=Drone):
+        """
+        preflight mission assignment and various status and safety checks and registrations
+        """
 
-    # move drone
-    #prevLat = currentLat
-    #prevLon = currentLon
-    #prevFeat = {}
-    #prevFeat['type'] = "Feature"
-    #prevFeat['geometry'] = {}
-    #prevFeat['geometry']['type'] = "Point"
-    #prevFeat['geometry']['coordinates'] = []
-    #prevFeat['geometry']['coordinates'].append(prevLon)
-    #prevFeat['geometry']['coordinates'].append(prevLat)
-    #droneData['properties']['dynamicProperties']['archivedUpdates'].append(prevFeat)
-    
-    #currentLat = currentLat + .01
-    #currentLon = currentLon - .01
-    #currentTuple = [currentLon, currentLat, currentAlt]
-    #droneData['properties']['dynamicProperties']['location']['coordinates'] = currentTuple
-    #droneData['geometry']['coordinates'][0] = currentTuple
-    #flight_analysis = Geodesic.WGS84.Inverse(prevLat, prevLon, currentLat, currentLon)
-    #flight_bearing = flight_analysis['azi1']
-    #droneData['properties']['dynamicProperties']['bearing'] = flight_bearing
+        logState(self.logfiles['state'], "preflight")
+        
+        #certain failures cause preflight to restart so let's sleep for seconds upon entry
+        time.sleep(1)
+        
+        self.missionstate = "preflight"
+        """
+        Position Check
+        """
+        self.currentPosition = getCurrentPosition(drone)
+        if not checkPosition(self.currentPosition):
+            print("Position reporting not available.  Please resolve.")
+            return "preflight"
 
-    #drone_point = Point(currentLat, currentLon, currentAlt)
+        """
+        Battery Check
+        """
+        self.currentBattery = getCurrentBattery(drone)
+        if not checkBattery(self.currentBattery, None, None, None):
+            print("Battery needs charging or reporting incorrectly.  Please resolve.")
+            return "preflight"
 
-    #cell_towers = generateCellTowers(drone_point, cell_towers)  # regenerate cell towers
+        """
+        Heading Check
+        TBD--> Make sure it makes sense and is a number I suppose
+        """
+        self.currentHeading = drone.heading
 
-    #ground_stations = modulateGroundStationsLoad(25, ground_stations) #the integer represents maximum change in load from timeframe to timeframe
-    #ground_stations = generateGroundStations(drone_point, ground_stations) #regenerate ground stations
-    
-    #for tower in cell_towers:
-    #  towerDistanceCalc = Geodesic.WGS84.Inverse(currentLat, currentLon, tower['geometry']['coordinates'][1], tower['geometry']['coordinates'][0])
-    #  towerDistance = towerDistanceCalc['s12']
-    #  tower['properties']['distance'] = towerDistance
-    #  signal = 50 + (int(towerDistance / 1000) * 5) + random.randint(0,10) # calculate signal with some randomness (function of distance)... should max out around 110dB
-    #  tower['properties']['signal'] = signal 
-    #  rtt = int(towerDistance / 2000) + random.randint(0,5)  # calculate RTT with some randomness (factor of distance)
-    #  tower['properties']['rtt'] = rtt
+        """
+        Mission Check
+        TBD--> develop high level mission overview checks
+        """
+        self.missions = getMissions() #should probably include the position and battery and home info when asking for missions... may preclude some missions
+        if not self.missions:
+            print("No assignment... will check again in 10 seconds")
+            time.sleep(10)
+            return "preflight"
 
-    #  if 'bw' not in tower:
-    #    bw = 10 * ((50/signal) * (50/signal) * (50/signal)) #if signal is maxed out at 50dB this should yield 10mbps, falling off exponentially
-    #    tower['properties']['bandwidth'] = bw
+        """
+        Home Check
+        TBD--> compare it to your current location I suppose and guess if it's possible                                                                       """
+        self.currentHome = drone.home_coords
+        if self.currentHome is None:
+            print("Please ensure home position is set properly")
+            return "preflight"
 
-     # for station in ground_stations:
-     #   towerToStationDistanceCalc = Geodesic.WGS84.Inverse(station['geometry']['coordinates'][1], station['geometry']['coordinates'][0], tower['geometry']['coordinates'][1], tower['geometry']['coordinates'][0])
-      #  towerToStationDistance = towerToStationDistanceCalc['s12']
-      #  towerToStationRTT = int(towerToStationDistance / 3000) + random.randint(0,5)
-      #  tower['properties']['groundstationRTT'][station['properties']['name']] = towerToStationRTT
-      #  tower['properties']['groundstationDistance'][station['properties']['name']] = towerToStationDistance
-      #  station['properties']['towerRTT'][tower['properties']['name']] = towerToStationRTT
-      #  station['properties']['towerDistance'][tower['properties']['name']] = towerToStationDistance
+        """
+        Network Check
+        TBD--> Maybe check your throughput from that pad, or make it a networking system test (UE) rather than iperf
+        """
+        self.currentIperfObj = None
 
-    #find the closest tower to the drone
-    #nearestTowerDistance = 999999999 #huge val
-    #nearestCellTower = ""
-    #for tower in cell_towers:
-    #  if tower['properties']['distance'] < nearestTowerDistance:
-    #    nearestTowerDistance = tower['properties']['distance']
-    #    nearestCellTower = tower['properties']['name']
+        """
+        Airspace Check
+        TBD--> A placeholder for future important concepts like weather checks and UVRs.  Traffic also checked with DCB later
+        For now just use the first mission
+        """
+        if not checkAirspace(self.missions[0]['default_waypoints']):
+            print("Airspace not fit for flying, check back later")
+            return "preflight"
 
-    #denote it to the celltower object
-    #for tower in cell_towers:
-    #  if tower['properties']['name'] == nearestCellTower:
-    #    tower['properties']['nearestCellTower'] = "true"
-    #  else:
-    #    tower['properties']['nearestCellTower'] = "false"
+        """
+        Equipment Check
+        TBD--> Mission specific gear check.  Eg. Video mission should check camera status
+        """
+        if not checkEquipment(self.missions[0]):
+            print("Equipment not reporting correctly.  Please check")
+            return "preflight"
 
-      #denote the closest ground station to the tower
-    #  nearestGroundstationDistance = 999999999
-    #  nearestGroundstation = ""
-    #  for key in tower['properties']['groundstationDistance'].keys():
-    #    if tower['properties']['groundstationDistance'][key] < nearestGroundstationDistance:
-    #      nearestGroundstationDistance = tower['properties']['groundstationDistance'][key]
-    #      nearestGroundstation = key
-    #  tower['properties']['nearestGroundStation'] = nearestGroundstation
-     
-    #droneData['properties']['userProperties']['celltowers']['features'] = cell_towers
-    #droneData['properties']['userProperties']['groundstations']['features'] = ground_stations
+        """
+        Cloud Resources Check
+        TBD--> Mission specific cloud resources are queried for availability... not yet reserved
+        """
+        if not checkCloudResources(self.missions[0]):
+            print("Required cloud resources do not appear to be available")
+            return "preflight"
 
-    #drone_flights = [] #clear out the list of flights for now... ideally we'd just update a flight already existing in the list
-    #drone_flights.append(droneData)
+        """
+        Edge Resources Check
+        TBD--> Mission specific edge resources are queried for availability... not yet reserved
+        """
+        if not checkEdgeResources(self.missions[0]):
+            print("Required edge resources do not appear to be available")
+            return "preflight"
+        
+        """
+        keep track of previous states, starting now
+        """
+        self.previousSelfs = []
+        self.previousSelfs.append(self)
+        #we can only keep track for so long else risk filling up memory... unclear how long this array can be
+        if len(self.previousSelfs) > 10000:
+            self.previousSelfs.pop(0)
+        
+        #likely a lot more to check... 
 
-    #drones = {}
-    #drones['type'] = "FeatureCollection"
-    #drones['features'] = []
-    #drones['features'] = drone_flights
-    
-    # battery simulation
-    #currentBattery = currentBattery - 1
+        #print out missions
+        for mission in self.missions:            
+            print("mission: " + self.missions[0]['missionType'] + " leader: " + self.missions[0]['missionLeader'] + " priority: " + str(self.missions[0]['priority'] ))
+            #print out waypoints
+            for waypoint in self.missions[0]['default_waypoints']:
+                print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2])) 
 
-    #print(droneData)
-    #droneMessage = str(droneData, 'utf-8')
-    #droneMessage = droneData
-    #submitToBasestation(args, basechannel, drones)
+        #ok, try to accept mission
+        missionAccepted = acceptMission(self.missions[0])
+        if missionAccepted:
+            print (self.missions[0]['missionType'] + " mission accepted")
+            #check start time of mission
+            #check current time
+            #sleep diff
 
-  #  time.sleep(20)
-  
-  print("Flight is complete.  Exiting")
-  sys.exit()
+            #get your initial waypoint in the default waypoints before we take off
+            #initial_waypoint_location = dronekit.LocationGlobalRelative(self.missions[0]['default_waypoints'][0][1], self.missions[0]['default_waypoints'][0][0], self.missions[0]['default_waypoints'][0][2])
+            
+            #arm vehicle with aerpawlib... this is blocked in real life for safety
+            if not drone.armed:
+                print("drone not armed. Arming")
+                await drone.set_armed(True)
+                print("arming complete")
+            else:
+                print("drone is already armed")
 
-#def 
-def getDisplacement(startPosition, endPosition):
-  print (startPosition['lat'])
-  print( endPosition['lat'])
-  print(startPosition['lon'])
-  print(endPosition['lon'])
-  analysis = Geodesic.WGS84.Inverse(float(startPosition['lat']), float(startPosition['lon']), float(endPosition['lat']), float(endPosition['lon']))
-  bearing = analysis['azi1']                                                                                                                                                   
-  distance = analysis['s12']
-  startTime = startPosition['time']
-  startTimeTZ = startTime + "-05:00"
-  startTimeDate = datetime.fromisoformat(startTimeTZ)
-  startSecs = startTimeDate.timestamp()
-  endTime = endPosition['time']
-  endTimeTZ = endTime + "-05:00"
-  endTimeDate = datetime.fromisoformat(endTimeTZ)
-  endSecs = endTimeDate.timestamp()
-  interval = endSecs - startSecs
-  displacement = {}
-  displacement['distance'] = distance
-  displacement['bearing'] = bearing
-  displacement['interval'] = interval
-  return displacement
-
-def getLastLine(logfile):
-  with open(logfile, 'rb') as lfile:
-    try:
-      lfile.seek(-2, os.SEEK_END)
-      while lfile.read(1) != b'\n':
-        lfile.seek(-2, os.SEEK_CUR)
-    except OSError:
-      lfile.seek(0)
-    lline = lfile.readline().decode()
-    lfile.close()
-    return lline
-  
-def getCurrentTraffic(trafficLog):
-  tline = getLastLine(trafficLog)
-  if tline is not None and tline is not '\n':
-    print(tline)
-    tobj = json.loads(tline)
-    return tobj
-  else:
-    return None
-  
-def getCurrentPosition(vehicleLog):
-  currentPosition = {}
-  vline = getLastLine(vehicleLog)
-  if vline is not None and vline is not '\n':
-    print(vline)
-    vlinearr = vline.split(',')
-    if len(vlinearr) > 5:
-      currentPosition['lat'] = vlinearr[2]
-      currentPosition['lon'] = vlinearr[1]
-      currentPosition['alt'] = vlinearr[3]
-      currentPosition['time'] = vlinearr[5]
-      return currentPosition
-    else:
-      return None
-  else:
-    return None
-  
-def generateGroundStations(location, existing = []):
-  count = 2
-  distance_limit = 10000 #10 km
-
-  # remove out of range stations                                                                                                                                           
-  for station in existing:
-    drone_station_distance = Geodesic.WGS84.Inverse(location.latitude, location.longitude, station['geometry']['coordinates'][1], station['geometry']['coordinates'][0])['s12']
-    if drone_station_distance > distance_limit:
-      existing.remove(station)
-
-  # add stations if needed                                                                                                                                                 
-  out = existing
-  if len(existing) < count:
-    for i in range(count - len(existing)):
-      rand_distance = distance_limit - random.randint(int(distance_limit/1.1),distance_limit)
-      rel_bearing = random.random() * 180 - 90  # calculate a random relative heading between -90 and 90 degrees from the drone
-      new_station_dist = distance(kilometers=rand_distance / 1000)
-      new_station = new_station_dist.destination(location, rel_bearing)
-      longitude = new_station.longitude
-      latitude = new_station.latitude
-      this_tuple = [longitude, latitude, 0]
-      key = "gs_" + str(round(longitude,4)) + "_" + str(round(latitude,4))
-      this_station = {}
-      this_station['type'] = "Feature"
-      this_station['geometry'] = {}
-      this_station['geometry']['type'] = "Point"
-      this_station['geometry']['coordinates'] = this_tuple
-      this_station['properties'] = {}
-      this_station['properties']['ipaddress'] = assignIPAddr(existing)
-      this_station['properties']['classification'] = "groundstation"
-      this_station['properties']['name'] = key
-      this_station['properties']['towerRTT'] = {}
-      this_station['properties']['towerDistance'] = {}
-      this_station['properties']['load'] = random.randint(0, 100);
-      out.append(this_station)
-  return out
-
-def modulateGroundStationsLoad(maxChange, existing = []):
-  for station in existing:
-    station['properties']['load'] = station['properties']['load'] + random.randint(maxChange*-1, maxChange)
-    if station['properties']['load'] > 100:
-      station['properties']['load'] = 100
-    elif station['properties']['load'] < 0:
-      station['properties']['load'] = 0
-  return existing
-
-#def assignIPAddr(existing):
-#  eligibleIPs = []
-#  usedIPs = []
-#  for gstation in existing:
-#    usedIPs.append(gstation['properties']['ipaddress'])
-    
-#  ipAddrFile = "/var/lib/hostkey/public.json" #maybe move to args... main or local
-#  ipF = open(ipAddrFile, "r") # Use file to refer to the file object                                                                                                       
-#  ipdict = json.load(ipF)
-#  ipkeys = ipdict.keys()
-#  for key in ipkeys:
-#    if "worker" in key:
-#      if ipdict[key] not in usedIPs:
-#        eligibleIPs.append(ipdict[key])
-#  ipAddr = random.choice(eligibleIPs)
-#  return ipAddr
-  
-def getVehicleData(vehicleType):
-  thisVehicle = {}
-  if vehicleType == 1:
-    #FreeFly Alta drone... a surveillance drone
-    thisVehicle['weather_tolerances'] = {}
-    thisVehicle['weather_tolerances']['max_temperature'] = 45 #deg C                                                
-    thisVehicle['weather_tolerances']['min_temperature'] = -20 #deg C                                               
-    thisVehicle['weather_tolerances']['wind_tolerance']  = 13 #m/s ~= 25 kts                                        
-    thisVehicle['weather_tolerances']['precip_tolerance'] = 0 #normally units should be mm/hr                       
-    thisVehicle['vehicle_description'] = "Surveillance Drone"
-    thisVehicle['vehicle_model'] = "Freefly Alta Pro"
-    thisVehicle['vehicle_type'] = "multirotor"
-    thisVehicle['propulsion'] = {}
-    thisVehicle['propulsion']['num_props'] = 8
-    thisVehicle['propulsion']['piloted'] = 0
-    thisVehicle['propulsion']['can_hover'] = 1
-    thisVehicle['propulsion']['horizontal_velocity'] = 15 #units m/s                                                
-    thisVehicle['power'] = {}
-    thisVehicle['power']['battery_mass'] = 0.515 #units kg                                                          
-    thisVehicle['power']['primary_power_source'] = "battery"
-    thisVehicle['power']['battery_voltage'] = 22.8
-    thisVehicle['power']['battery_type'] = "lithium"
-    thisVehicle['power']['battery_mAh'] = 4280
-    thisVehicle['power']['number_of_batteries'] = 1
-    thisVehicle['power']['battery_energy'] = 97.58
-    thisVehicle['vehicle_cost'] = 10000 # in USD                                                                    
-    thisVehicle['limits'] = {}
-    thisVehicle['limits']['max_payload_mass'] = 9.07 #kg                                                            
-    thisVehicle['limits']['max_noise'] = 60
-    thisVehicle['limits']['max_range'] = 45 #km
-    thisVehicle['limits']['max_airspeed'] = 20 #m/s                                                                 
-    thisVehicle['dimensions'] = {}
-    thisVehicle['dimensions']['drag_coefficient'] = 0.54
-    thisVehicle['dimensions']['front_surface'] = 1 #m^3                                                             
-    thisVehicle['dimensions']['vehicle_mass'] = 6.17 #kg                                                            
-    thisVehicle['dimensions']['width'] = 1.325 #m
-
-  return thisVehicle
-
-def handleArguments(properties):
-  parser = ArgumentParser()
-  parser.add_argument("-u", "--rabbituser", dest="rabbituser", default=properties['rabbituser'],
-                      type=str, help="The username for RabbitMQ.  Default is in the config file.")
-  parser.add_argument("-p", "--rabbitpass", dest="rabbitpass", default=properties['rabbitpass'],
-                      type=str, help="The password for RabbitMQ.  Default is in the config file.")
-  parser.add_argument("-b", "--basestation-host", dest="basestation_host", default=properties['basestation_host'],
-                      type=str, help="The host/IP address for the basestation RabbitMQ.  Default is in the config file.")
-  parser.add_argument("-v", "--basestation-vhost", dest="basestation_vhost", default=properties['basestation_vhost'],
-                      type=str, help="The virtual host for the basestation RabbitMQ.  Default is in the config file.")
-  parser.add_argument("-q", "--basestation-queue", dest="basestation_queue", default=properties['basestation_queue'],
-                          type=str, help="The basestation RabbitMQ queue name.  Default is in the config file.")
-  parser.add_argument("-e", "--basestation-exchange", dest="basestation_exchange", default=properties['basestation_exchange'],
-                          type=str, help="The basestation RabbitMQ exchange name.  Default is in the config file.")
-  parser.add_argument("-t", "--traffic-log", dest="traffic_log", default=properties['traffic_log'],
-                      type=str, help="The traffic log file. Default is in the config file.")
-  parser.add_argument("-l", "--vehicle-log", dest="vehicle_log", default=properties['vehicle_log'],
-                      type=str, help="The vehicle log file.  Default is in the config file.")
-  return parser.parse_args()
-
-def daemonize():
-    try:
-        pid = os.fork()
-    except OSError as e:
-        raise Exception("%s [%d]" % (e.strerror, e.errno))
-
-    if (pid == 0):
-        os.setsid()
-        try:
-            pid = os.fork()    # Fork a second child.
-        except OSError as e:
-            raise Exception("%s [%d]" % (e.strerror, e.errno))
-        if (pid == 0):
-            os.chdir("/")
-            os.umask(0)
+            return "takeoff"
         else:
-            os._exit(0)
+            print("Mission canceled")
+            return "preflight"
+    
+    @state(name="takeoff")
+    async def takeoff(self, drone: Drone):
+        print("takeoff")
+        
+        #takeoff to height of the first waypoint or 25 meters, whichever is higher                                                                                                
+        if len(self.missions[0]['default_waypoints']) > 1:
+            target_alt = self.missions[0]['default_waypoints'][1][2]
+        else:
+            print("recheck your mission")
+            return "preflight"
+
+        if target_alt < 30:
+            target_alt = 30
+
+        print("takeoff to " + str(target_alt) + "m")
+        await drone.takeoff(target_alt)
+        print("reached " + str(target_alt) + "m")
+        
+        #you should be at default_waypoints[1] now
+        #with [1] being directly above [0], which is the home position on the ground                                                                                              
+        self.currentWaypointIndex = 1
+        return "waypoint_entry"
+
+    @state(name="waypoint_entry")
+    async def waypoint_entry(self, drone: Drone):
+        """
+        waypoint_entry
+        update position, battery, heading, attitude, etc 
+        identify and execute any mission related functions to be performed upon arrival at waypoint
+        """
+        logState(self.logfiles['state'], "waypoint_entry")
+        #update position and battery and gps and heading
+        statusAttempts = 5
+        statusAttempt = 0
+        while True:
+            print("get position.  Attempt: " + str(statusAttempt))
+            self.currentPosition = getCurrentPosition(drone)
+            if not checkPosition(self.currentPosition):
+                if statusAttempt > statusAttempts:
+                    #GPS does not seem to be working... try to go home
+                    print("Can't query position.  Abort")
+                    return "abortMission"
+                else:
+                    statusAttempt = statusAttempt + 1
+                    time.sleep(1)
+            else:
+                #position seems fine
+                #try to report it (maybe only if you aren't the mission leader?)
+                #if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":
+                print("report position to basestation")
+                recv = await self.reportPositionUDP()
+                if (recv):
+                #denote that you had connectivity here for that spot
+                    print("report position to basestation confirmed")
+                    self.communications['reportPositionUDP'] = 1
+                else:
+                    self.communications['reportPositionUDP'] = 0
+                    print("no reply from server while transmitting position")
+                    
+                statusAttempt = 0
+                break
+        
+        while True:
+            print("check battery.  Attempt: " + str(statusAttempt))
+            self.currentBattery = getCurrentBattery(drone)
+            if self.currentBattery is None:
+                if statusAttempt > statusAttempts:
+                    #Battery check does not seem to be working... try to go home  
+                    print("Can't query battery.  Abort")
+                    return "abortMission"
+                else:
+                    statusAttempt = statusAttempt + 1
+                    time.sleep(1)
+            else:
+                #battery seems fine
+                print("battery is communicating")
+                statusAttempt =	0
+                break
+            
+        
+        #self.currentAttitude = getCurrentAttitude(drone)
+        self.currentHeading = drone.heading
+
+        #check for mission actions to be performed at the start of this state
+        self.nextStates = getEntryMissionActions(self.missions[0]['missionType'])
+
+        #move onto the next pending task or default task
+        return "nextAction"
+        
+        
+    @state(name="flight")
+    async def flight(self, drone: Drone):
+        logState(self.logfiles['state'], "flight")
+        #check if we have enough to go, at minimum, from here to the next default waypoint and to home
+        print ("check for sufficient battery... note, no good way to do this yet, so it's a placeholder")
+        if not len(self.missions[0]['default_waypoints']) > (self.currentWaypointIndex + 2):
+            print("no more waypoints... go home if not already there and land")
+            return "abortMission"
+
+        battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1])
+        if not battery_check:
+            print("battery check fail")
+            return "abortMission"
+
+        defaultNextCoord = Coordinate(self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][2])
+        
+
+        ##set heading... unnecessary unless we want to have a heading other than the direction of motion 
+        #drone.set_heading(bearing_from_here)
+        
+        await drone.goto_coordinates(defaultNextCoord)
+
+        #if you are not using await above, delete this
+        self.currentWaypointIndex = self.currentWaypointIndex + 1
+        
+        """
+        below, implement things to do while flying... skip for now... might have to remove the await statement above to do this stuff
+        while True:
+            #perform mission stuff like iperf eventually, but here just track your progress                                                                           
+            while True:
+                self.currentPosition = getCurrentPosition(drone)
+                if not checkPosition(self.currentPosition):
+                    if statusAttempt > statusAttempts:
+	                #GPS does not seem to be working... try to go home               
+                        print("Can't query position.  Abort")
+                        return "abortMission"
+                    else:
+                        statusAttempt = statusAttempt + 1
+                        time.sleep(1)
+                else:
+                    #position seems fine                                                                                                                 
+                    statusAttempt = 0
+                    break
+            
+            geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], 1025)
+            flight_dx_from_here = geodesic_dx.get('s12')
+            print(str(self.currentPosition.lat) + " " + str(self.currentPosition.lon) + " " + str(self.currentPosition.alt))
+            #get within 5 meters?                                                                                                                                     
+            if flight_dx_from_here < 5:
+                print("arrived at initial waypoint")
+                self.currentWaypointIndex = self.currentWaypointIndex + 1
+                break
+            time.sleep(1)
+        """
+        #you've arrived at your next waypoint
+        return "waypoint_entry" 
+
+    @state(name="instructionRequest")
+    async def instructionRequest(self, drone: Drone):
+        logState(self.logfiles['state'], "instructionRequest")
+        defaultSequence = "flight"
+        nextSequence = defaultSequence
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "instructionRequest"
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                if 'requests' in serverReply:
+                    theseRequests = serverReply['requests']
+                    print(theseRequests)
+                    #just handle the first request for now
+                    if serverReply['requests'] is not None:
+                        thisPrimaryRequest = theseRequests[0]
+                        if 'command' in thisPrimaryRequest:
+                            requestIsValid = validateRequest(thisPrimaryRequest['command'])
+                            if requestIsValid:
+                                print("performing request: " + thisPrimaryRequest['command'])
+                                nextSequence = thisPrimaryRequest['command']
+                            else:
+                                print("request not valid.  Going to default action: " + nextSequence)
+
+                        else:
+                            print("command not present in this request.  Going to default action: " + nextSequence)
+                    else:
+                        print("no requests at the moment. Going to default action: " + nextSequence)
+                else:
+                    print("requests not present in server reply. Going to default action: " + nextSequence)
+            else:
+                print ("uuid mismatched.  Going to default action: " + nextSequence)
+        else:
+            print("No reply from server.  Going to default action: " + nextSequence)
+        
+        #if for any reason you asked for a request and didn't get one or got a bad one, we're on our own for now
+        #implement safety checks
+        #check how far we are from the home location
+        #implement me
+        #estimate how much battery it will take to get there
+        #implement me
+        #reqBatteryToGetHome = 30
+        #if currentBattery['level'] < reqBatteryToGetHome:
+        #look for new home within range... if none available, head toward home and prepare for crash landing
+        #elif currentBattery['level'] >= reqBatteryToGetHome and currentBattery['level'] < reqBatteryToGetHome + 10:
+        #look for new home or go home
+        
+        return nextSequence
+        
+        
+    @timed_state(name="iperf",duration = 3)
+    async def iperf(self, drone: Drone):
+        logState(self.logfiles['state'], "iperf")
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "iperfResults"
+        msg['iperfResults'] = {}
+        client = iperf3.Client()
+        client.server_hostname = "172.16.0.1"
+        client.port = 5201
+        client.duration = 1
+        client.json_output = True
+        result = client.run()
+        err = result.error
+        iperfPosition = getCurrentPosition(drone)
+        msg['iperfResults']['ipaddr'] = client.server_hostname
+        msg['iperfResults']['port'] = client.port
+        msg['iperfResults']['protocol'] = "tcp" #static for now
+        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+        if err is not None:
+            msg['iperfResults']['connection'] = err
+            msg['iperfResults']['mbps'] = None
+            msg['iperfResults']['retransmits'] = None
+            msg['iperfResults']['meanrtt'] = None
+            thistime = datetime.now()
+            unixsecs = datetime.timestamp(thistime)
+            msg['iperfResults']['unixsecs'] = int(unixsecs)
+        else:
+            datarate = result.sent_Mbps
+            retransmits = result.retransmits
+            unixsecs = result.timesecs
+            result_json = result.json
+            meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
+            msg['iperfResults']['connection'] = 'ok'
+            msg['iperfResults']['mbps'] = datarate
+            msg['iperfResults']['retransmits'] = retransmits
+            msg['iperfResults']['unixsecs'] = unixsecs
+            msg['iperfResults']['meanrtt'] = meanrtt
+
+        result_str = json.dumps(msg)
+        with open(self.logfiles['iperf'], "a") as ofile:
+            ofile.write(result_str + "\n")
+            ofile.close()
+        self.currentIperfObj = msg['iperfResults']
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 2)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                self.communications['iperf'] = 1
+            else:
+                print(serverReply['type_received'] + " does not match our message UUID")
+                self.communications['iperf'] = 0
+        else:
+            print("no reply from server while transmitting iperfResults")
+            self.communications['iperf'] = 0
+        return "nextAction"
+
+    @state(name="sendVideo")
+    async def sendVideo(self, _ ):
+        logState(self.logfiles['state'], "sendVideo")
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "sendVideo"
+        msg['collectVideo'] = {}
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+        return "nextAction"
+
+        
+    @state(name="collectVideo")
+    async def collectVideo(self, _ ):
+        logState(self.logfiles['state'], "collectVideo")
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "collectVideo"
+        msg['collectVideo'] = {}
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+        return "nextAction"
+
+    @state(name="abortMission")
+    async def abortMission(self, drone: Drone):
+        logState(self.logfiles['state'], "abortMission")
+        #consider checking rally points 
+        
+        #problem with below is that it does not descend vertically.
+        #if self.currentHome is not None:
+        #    await drone.goto_coordinates(self.currentHome)
+
+        #another option... go to waypoint 1 for now which should be over the home position
+        overHomePositionCoord = Coordinate(self.missions[0]['default_waypoints'][1][1], self.missions[0]['default_waypoints'][1][0], self.missions[0]['default_waypoints'][1][2])
+        #drone.set_heading(bearing_from_here)
+        await drone.goto_coordinates(overHomePositionCoord)
+        
+        print("land")
+        await drone.land()
+        print("flight complete")
+        sys.exit()
+
+    @state(name="nextAction")
+    async def nextAction(self, _ ):
+        #check to see if we have anything else pending to do                                                                                                                         
+        logState(self.logfiles['state'], "nextAction")
+        if self.nextStates:
+            while self.nextStates:
+                reqIsValid = validateRequest(self.nextStates[0])
+                if not reqIsValid:
+                    self.nextStates.pop(0)
+                else:
+                    nextState = self.nextStates[0]
+                    self.nextStates.pop(0)
+                    return nextState
+                
+        #nothing pending
+        #if basestation or cloud is the leader, return instruction request as default
+
+        if self.missions:
+            if "missionLeader" in self.missions[0]:
+                if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":
+                    return "instructionRequest"
+        #if drone is the missionLeader, return flight
+        return "flight"
+    
+    async def reportPositionUDP(self):
+        print (str(self.currentPosition.lat) + " " + str(self.currentPosition.lon) + " " + str(self.currentPosition.alt) + " " + str(self.currentPosition.time))
+    
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "telemetry"
+        msg['telemetry'] = {}
+        msg['telemetry']['position'] = []
+        msg['telemetry']['position'].append(self.currentPosition.lat)
+        msg['telemetry']['position'].append(self.currentPosition.lon)
+        msg['telemetry']['position'].append(self.currentPosition.alt)
+        msg['telemetry']['position'].append(self.currentPosition.time)
+        msg['telemetry']['gps'] = {}
+        msg['telemetry']['gps']['satellites_visible'] = self.currentPosition.satellites_visible
+        msg['telemetry']['gps']['fix_type'] = self.currentPosition.fix_type
+        msg['telemetry']['battery'] = {}
+        msg['telemetry']['battery']['voltage'] = self.currentBattery.voltage
+        msg['telemetry']['battery']['current'] = self.currentBattery.current
+        msg['telemetry']['battery']['level'] = self.currentBattery.level
+        #msg['telemetry']['attitude'] = {} 
+        #msg['telemetry']['attitude']['pitch'] = self.currentAttitude['pitch']
+        #msg['telemetry']['attitude']['yaw'] = self.currentAttitude['yaw']
+        #msg['telemetry']['attitude']['roll'] = self.currentAttitude['roll']  
+        msg['telemetry']['heading'] = self.currentHeading
+        msg['telemetry']['home'] = []
+        msg['telemetry']['home'].append(self.currentHome.lat)
+        msg['telemetry']['home'].append(self.currentHome.lon)
+        msg['telemetry']['home'].append(self.currentHome.alt)
+        
+        #log telemetry
+        result_str = json.dumps(msg)
+        with open(self.logfiles['telemetry'], "a") as ofile:
+            ofile.write(result_str + "\n")
+            ofile.close()
+      
+        serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+        if serverReply is not None:
+            #print(serverReply) 
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                return 1
+            else:
+                print("we have a mismatch in uuids... investigate")
+                return 0
+        return 0
+    
+def getMissions():
+    x = uuid.uuid4()
+    msg = {}
+    msg['uuid'] = str(x)
+    msg['type'] = "mission"
+    serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+    if serverReply is not None:
+        print(serverReply['uuid_received'])
+        if serverReply['uuid_received'] == str(x):
+            print(serverReply['type_received'] + " receipt confirmed by UUID")
+            if 'missions' in serverReply:
+                missions = serverReply['missions']
+                return missions
+    return None
+
+def getCurrentPosition(drone: Drone):
+    if drone.connected:
+        pos = drone.position
+        gps = drone.gps
+        thisPosition = Position()
+        thisPosition.lat = pos.lat
+        thisPosition.lon = pos.lon
+        thisPosition.alt = pos.alt
+        thisPosition.time = datetime.now().astimezone().isoformat()
+        thisPosition.fix_type = gps.fix_type
+        thisPosition.satellites_visible = gps.satellites_visible
+        return thisPosition
     else:
-        os._exit(0)
+        return None
 
-#def submitToBasestation(args, channel, message):
-#  channel.basic_publish(
-#    exchange=args.basestation_exchange,
-#    routing_key=exchangeRoutingKey,
-#    body=json.dumps(message),
-#    properties=pika.BasicProperties( delivery_mode = 2 )
-#  )
-#  return
+def getCurrentBattery(drone: Drone):
+    if drone.connected:
+        battery = drone.battery
+        thisBattery = Battery()
+        thisBattery.voltage = battery.voltage
+        thisBattery.current = battery.current
+        thisBattery.level = battery.level
+        return thisBattery
+    else:
+        return None
 
-if __name__ == '__main__':
-  # read the config file which is config.ini
-  configProperties = readConfig("config.ini")
-  exchangeRoutingKey = "#"; #may need to be read out of config
-  args = handleArguments(configProperties)
-  main(args)
-  #daemonize()
-  #t = threading.Thread(target=main, args=[args])
-  #threads.append(t)
-  #t.start()
-  #print(threading.currentThread().getName())
+#def getCurrentAttitude(vehicle: Vehicle):
+    #function does not work
+    #Vehicle in aerpawlib needs to be updated
+    #    if drone.connected:
+#        attitude = drone.Attitude
+#        currentAttitude = {}
+#        currentAttitude['pitch'] = attitude[0]
+#        currentAttitude['yaw'] = attitude[1]
+#        currentAttitude['roll'] = attitude[2]
+#        return currentAttitude
+#    else:
+#        return None
+
+def getVideoLocation():
+    #check on the specific camera software configuration
+    #maybe add a camera argument
+    #or just hardcode for now:
+    videoLocation = "/opt/video/"
+    return videoLocation
+    
+    
+def validateRequest(request):
+    validReq = []
+    validReq.append("iperf")
+    validReq.append("waypoint_entry")
+    validReq.append("flight")
+    validReq.append("sendVideo")
+    validReq.append("collectVideo")
+    validReq.append("instructionRequest")
+
+    if request in validReq:
+        return 1    
+    else:
+        return 0
+
+def checkPosition(thisPosition):
+    #print(thisPosition.lat)
+    #print(thisPosition.lon)
+    #sys.exit()
+    if thisPosition is None:
+        print("position not available")
+        return 0
+    #if 'lat' in thisPosition and 'lon' in thisPosition and 'alt' in thisPosition:
+    if thisPosition.lat is None or thisPosition.lon is None or thisPosition.alt is None:
+        print("Unable to query current latitude and/or longitude coordinates or altitude!")
+        return 0
+    #else:
+    #    print("lat and/or lon and/or alt missing")
+    #    return 0
+    #if "satellites_visible" in thisPosition:
+    if thisPosition.satellites_visible is None:
+        print("Unable to query for gps satellites")
+        return 0
+    elif thisPosition.satellites_visible == 0:
+        print("no gps satellites visible")
+        return 0
+    #else:
+    #    print("satellites visible missing")
+    #    return 0
+    
+    #if "fix_type" in thisPosition:
+    if thisPosition.fix_type is None:
+        print("Unable to query for gps fix_type")
+        return 0
+    elif thisPosition.fix_type == 0 or thisPosition.fix_type == 1:
+        print("no gps fix")
+        return 0
+    #else:
+    #    print("fix_type missing")
+    #    return 0
+    
+    #value check
+    if thisPosition.lat >= -90 and thisPosition.lat <= 90:
+        if thisPosition.lon > -360 and thisPosition.lon < 360:
+            if thisPosition.alt >= 0:
+                #if thisPosition.time... 
+                #or don't
+                return 1
+    #value check fail
+    print ("incorrect latitude or longitude values")
+    return 0
+
+def checkBattery(thisBattery, thisPosition, thisHome, destination):
+    """
+    destination: [lon,lat]
+    """
+    if destination is not None:
+        #check the distance from the current location:                                                                                             
+        geodesic_dx_a = Geodesic.WGS84.Inverse(thisPosition.lat, thisPosition.lon, destination[1], destination[0], 1025)
+        dx_from_here = geodesic_dx_a.get('s12')
+        print("distance to waypoint: " + str(dx_from_here))
+        geodesic_dx_b = Geodesic.WGS84.Inverse(destination[1], destination[0], thisHome.lat, thisHome.lon, 1025)
+        dx_home_from_there = geodesic_dx_b.get('s12')
+        print("distance from waypoint to home: " + str(dx_home_from_there))
+        total_dx = dx_home_from_there + dx_from_here
+        print("total_dx is " + str(total_dx))
+        #implement a model of distance to battery... for now just say ok
+        if (1):
+            return 1
+
+    #also the more generic checkBattery call with just the battery specified returns a
+    if thisBattery is not None:
+        if thisBattery.voltage > 0:
+            if thisBattery.level > 10:
+                #check current
+                #if thisBattery.current >= 0:
+                #or don't
+                return 1
+            
+    return 0
+
+def checkAirspace(theseWaypoints):
+    """
+    checkAirspace
+    TBD-->check for UVRs, weather, gps, network outages
+    """
+    return 1
+
+def checkEquipment(thismission):
+    """
+    checkEquipment
+    TBD-->status check for mission specific equipment, such as camera, anemometer, etc
+    """
+    return 1
+
+def checkCloudResources(thismission):
+    """
+    checkCloudResources
+    TBD-->first, check to see if the mission object specifies any cloud resources
+    if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
+    """
+    return 1
+
+def checkEdgeResources(thismission):
+    """      
+    checkCloudResources 
+    TBD-->first, check to see if the mission object specifies any edge resources
+    if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
+    """
+    return 1
+
+def acceptMission(thismission):
+    x = uuid.uuid4()
+    msg = {}
+    msg['uuid'] = str(x)
+    msg['type'] = "acceptMission"
+    serverReply = udpClientMsg(msg, "172.16.0.1", 20001, 1)
+    if serverReply is not None:
+        print(serverReply['uuid_received'])
+        if serverReply['uuid_received'] == str(x):
+            print(serverReply['type_received'] + " receipt confirmed by UUID")
+            if 'missionstatus' in serverReply:
+                thisMissionStatus = serverReply['missionstatus']
+                
+                if thisMissionStatus == "canceled":
+                    return 0
+                elif thisMissionStatus == "confirmed":
+                    return 1
+                else:
+                    return 0
+    return 0
+
+def getEntryMissionActions(missiontype):
+    mission_actions = []
+    if missiontype == "bandwidth":
+        mission_actions.append('iperf')
+    return mission_actions
+
+def logState(logfile, state):
+    now_rfc3339 = datetime.now().astimezone().isoformat()
+    simpleStateJSON = {'time': now_rfc3339, 'state': state }
+    result_str = json.dumps(simpleStateJSON)
+    print(result_str)
+
+    with open(logfile, "a") as ofile:
+        ofile.write(result_str + "\n")
+        ofile.close()
+        
+def udpClientMsg(msg, address, port, timeout_in_seconds):
+    try:
+        serialMsg = pickle.dumps(msg)
+        serverLoc = (address, port)
+        chunkSize = 1024
+        UDPClientSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        UDPClientSocket.sendto(serialMsg, serverLoc)
+        UDPClientSocket.setblocking(0)
+        readiness = select.select([UDPClientSocket], [], [], timeout_in_seconds)
+        if readiness[0]:
+            serialMsgFromServer = UDPClientSocket.recvfrom(chunkSize)
+            try:
+                server_msg = pickle.loads(serialMsgFromServer[0])
+                "Reply from Server {}".format(server_msg)
+                print(server_msg)
+                return server_msg
+            except pickle.UnpicklingError as upe:
+                print("bad response from server: " + upe)
+                return None
+        else:
+            print("timeout")
+            return None
+    except pickle.PicklingError as pe:
+        print("could not encode data")
+        return None
+        
