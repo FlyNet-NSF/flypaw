@@ -1,6 +1,6 @@
-import requests
+#import requests
 import json
-import geojson
+#import geojson
 import time
 import sys
 import os
