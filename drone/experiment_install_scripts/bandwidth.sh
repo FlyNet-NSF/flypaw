@@ -7,7 +7,10 @@ apt-get install -y git
 #git clone https://github.com/CASAelyons/flypaw.git
 
 #requires python3.7+ which should be installed... otherwise install it...
+python3.7 -m pip install --upgrade pip
+
 #if something higher than 3.7 is installed, modify pip accordingly
+
 PIP=pip3.7
 ${PIP} install iperf3
 ${PIP} install geographiclib
