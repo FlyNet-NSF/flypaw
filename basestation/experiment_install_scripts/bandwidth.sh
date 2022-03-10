@@ -10,7 +10,7 @@ apt-get install -y iperf3
 apt-get install -y python3.8
 
 #as root, in /root directory, per the aerpaw standard experiment instruction
-git clone https://github.com/CASAelyons/flypaw.git
+#git clone https://github.com/CASAelyons/flypaw.git
 
 #copy run scripts to proper locations
 cp /root/flypaw/basestation/experiment_run_scripts/bandwidth/startBandwidthExperiment.sh /root
