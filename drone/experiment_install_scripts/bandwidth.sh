@@ -4,7 +4,7 @@
 apt-get install -y git
 
 #as root, in /root directory, per the aerpaw standard experiment instruction
-git clone https://github.com/CASAelyons/flypaw.git
+#git clone https://github.com/CASAelyons/flypaw.git
 
 #requires python3.7+ which should be installed... otherwise install it...
 #if something higher than 3.7 is installed, modify pip accordingly
