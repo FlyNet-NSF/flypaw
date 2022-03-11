@@ -17,6 +17,8 @@ cp /root/flypaw/basestation/experiment_run_scripts/bandwidth/startBandwidthExper
 
 cp /root/flypaw/basestation/experiment_run_scripts/bandwidth/startBasestationAgent.sh /root/Profiles/ProfileScripts/Vehicle
 
+cp /root/Profiles/ProfileScripts/Radio/Samples/startSRSRAN-SISO-EPCandENB.sh /root/Profiles/ProfileScripts/Radio/startRadio.sh
+
 #for tcp iperf3 server
 cp /root/flypaw/basestation/experiment_run_scripts/bandwidth/startIperf3Server_tcp.sh /root/Profiles/ProfileScripts/Traffic/startTraffic.sh
 

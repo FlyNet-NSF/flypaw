@@ -24,7 +24,7 @@ cp /root/flypaw/drone/experiment_run_scripts/bandwidth/startFlypawPilot.sh /root
 
 cp /root/flypaw/drone/experiment_run_scripts/bandwidth/flypawPilot.sh /root/Profiles/ProfileScripts/Vehicle/Helpers
 
-cp /root/Profiles/ProfileScripts/Radio/Samples/startSRSRAN_SISO_UE.sh /root/Profiles/ProfileScripts/Radio/startRadio.sh
+cp /root/Profiles/ProfileScripts/Radio/Samples/startSRSRAN-SISO-UE.sh /root/Profiles/ProfileScripts/Radio/startRadio.sh
 
 #then, to start:
 /bin/bash /root/startBandwidthExperiment.sh
