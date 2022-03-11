@@ -15,7 +15,7 @@ PIP=pip3.7
 ${PIP} install iperf3
 ${PIP} install geographiclib
 ${PIP} install uuid
-${PIP} install dronekit￼
+#${PIP} install dronekit￼
 
 #copy run scripts to proper locations
 cp /root/flypaw/drone/experiment_run_scripts/bandwidth/startBandwidthExperiment.sh /root
