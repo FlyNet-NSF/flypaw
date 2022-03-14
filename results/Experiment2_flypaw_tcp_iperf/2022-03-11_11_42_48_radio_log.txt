@@ -1,0 +1,22 @@
+[2022-03-11 11:42:48.505889] Couldn't open , trying /root/.config/srsran/ue.conf
+[2022-03-11 11:42:48.506021] Reading configuration file /root/.config/srsran/ue.conf...
+[2022-03-11 11:42:48.564538] 
+[2022-03-11 11:42:48.564589] Built in Release mode using commit 25f494e4e on branch master.
+[2022-03-11 11:42:48.564599] 
+[2022-03-11 11:42:48.596241] Opening 1 channels in RF device=default with args=default
+[2022-03-11 11:42:48.596290] Available RF device list: UHD  zmq 
+[2022-03-11 11:42:48.596300] Trying to open RF device 'UHD'
+[2022-03-11 11:42:50.503144] Opening USRP channels=1, args: type=b200,master_clock_rate=23.04e6
+[2022-03-11 11:42:59.554860] RF device 'UHD' successfully opened
+[2022-03-11 11:42:59.907936] Waiting PHY to initialize ... done!
+[2022-03-11 11:42:59.910691] Attaching UE...
+[2022-03-11 11:42:59.910736] Enter t to stop trace.
+[2022-03-11 11:42:59.910745] Closing stdin thread.
+[2022-03-11 11:42:59.910877] --- disconnected ---
+[2022-03-11 11:43:00.973697] ....--- disconnected ---
+[2022-03-11 11:43:01.949965] ........--- disconnected ---
+[2022-03-11 11:43:02.927616] ........--- disconnected ---
+[2022-03-11 11:43:04.026305] .........--- disconnected ---
+[2022-03-11 11:43:05.002724] ........--- disconnected ---
+[2022-03-11 11:43:05.613371] .....
+[2022-03-11 11:43:06.018446] ...--- disconnected ---
