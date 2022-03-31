@@ -329,7 +329,7 @@ class FlyPawPilot(StateMachine):
         logState(self.logfiles['state'], "flight")
         #check if we have enough to go, at minimum, from here to the next default waypoint and to home
         print ("check for sufficient battery... note, no good way to do this yet, so it's a placeholder")
-        if not len(self.missions[0]['default_waypoints']) > (self.currentWaypointIndex + 2):
+        if not len(self.missions[0]['default_waypoints']) > (self.currentWaypointIndex + 1):
             print("no more waypoints... go home if not already there and land")
             return "abortMission"
 
@@ -435,7 +435,7 @@ class FlyPawPilot(StateMachine):
         return nextSequence
         
         
-    @timed_state(name="iperf",duration = 3)
+    @timed_state(name="iperf",duration = 5)
     async def iperf(self, drone: Drone):
         logState(self.logfiles['state'], "iperf")
         x = uuid.uuid4()
@@ -446,7 +446,7 @@ class FlyPawPilot(StateMachine):
         client = iperf3.Client()
         client.server_hostname = "172.16.0.1"
         client.port = 5201
-        client.duration = 1
+        client.duration = 3
         client.json_output = True
         result = client.run()
         err = result.error
@@ -535,7 +535,8 @@ class FlyPawPilot(StateMachine):
         #    await drone.goto_coordinates(self.currentHome)
 
         #another option... go to waypoint 1 for now which should be over the home position
-        overHomePositionCoord = Coordinate(self.missions[0]['default_waypoints'][1][1], self.missions[0]['default_waypoints'][1][0], self.missions[0]['default_waypoints'][1][2])
+        #overHomePositionCoord = Coordinate(self.missions[0]['default_waypoints'][1][1], self.missions[0]['default_waypoints'][1][0], self.missions[0]['default_waypoints'][1][2])
+        overHomePositionCoord = Coordinate(self.currentHome.lat, self.currentHome.lon, 30)
         #drone.set_heading(bearing_from_here)
         await drone.goto_coordinates(overHomePositionCoord)
         
