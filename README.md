@@ -10,6 +10,8 @@ A flowchart illustrating the proposed multi-tiered architecture with some exampl
 ![AerPaw State Flowchart](https://user-images.githubusercontent.com/30157582/162526175-85f08f8c-70eb-45b4-ad2e-2f896eff5fd0.png)
 
 
+CURRENT REPOSITORY STRUCTURE
+
 /basestation
 
 	#Base directory for software designed to run on the basestation
