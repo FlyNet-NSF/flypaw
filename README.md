@@ -5,6 +5,8 @@ FlyNet is an NSF funded (Award #: 2018074) CC* Integration project lead by the U
 
 The flypaw repository shall contain tools and libraries that can be used in isolation, or as part of larger end-to-end experiments. Integration codes will largely consist of python3 and shell scripts made available to users, but specific applications for given experiments may be written in C, C++, or java, in some cases with only containers made avaliable from dockerhub.  Individual tools and larger experiment frameworks shall be described below as they are created.
 
+A flowchart illustrating the proposed multi-tiered architecture with some example mission objectives.  Some of this has been implemented already, some of it is placeholders.  Consider how your experiment might fit similarly!
+[AerPaw State Flowchart(1).pdf](https://github.com/CASAelyons/flypaw/files/8455112/AerPaw.State.Flowchart.1.pdf)
 
 /basestation
 
