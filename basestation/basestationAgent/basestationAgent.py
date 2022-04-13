@@ -221,7 +221,10 @@ class FlyPawBasestationAgent(object):
                     #get final approval of DCB
                     #do any preflight resource reservation with Mobius, etc
                     #register flight in ACS or wherever
-                    #if all good
+                    #if all good, send back ack to drone
+                    from basestation.basestationAgent.cloud_resources import CloudResources
+                    cloud_resources = CloudResources(slice_name="basestation")
+                    cloud_resources.create_resources()
                     msgFromServer['missionstatus'] = "confirmed"
 
                 elif msgType == "telemetry":
