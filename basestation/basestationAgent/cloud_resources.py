@@ -23,7 +23,7 @@ class CloudResources:
         except Exception as e:
             print(f"Error: {e}")
 
-    def create_resources(self):
+    def create_resources(self) -> bool:
         try:
             # Create Slice
             slice_object = fablib.new_slice(self.slice_name)
@@ -43,9 +43,10 @@ class CloudResources:
 
             # Submit Slice Request
             self.slice_id = slice_object.submit()
-
+            return True
         except Exception as e:
             print(f"{e}")
+        return False
 
     def delete_resources(self):
         try:
