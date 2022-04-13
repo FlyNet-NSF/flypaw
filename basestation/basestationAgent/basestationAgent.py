@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
 import socket
 import pickle
 import json
 import sys
+
+from cloud_resources import CloudResources
 #from aerpawlib.vehicle import Drone
 #from aerpawlib.vehicle import Vehicle
 #import dronekit
@@ -151,6 +154,7 @@ class FlyPawBasestationAgent(object):
         processedPlan = processPlan(plan)
         mission.default_waypoints = processedPlan['default_waypoints']
         self.missions.append({'missionType': mission.missionType, 'missionLeader': mission.missionLeader, 'default_waypoints': mission.default_waypoints, 'priority': mission.priority})
+        self.cloud_mgr = CloudResources(slice_name="base_station")
 
     def update_digital_twin(self, msg):
         """
@@ -222,9 +226,13 @@ class FlyPawBasestationAgent(object):
                     #do any preflight resource reservation with Mobius, etc
                     #register flight in ACS or wherever
                     #if all good, send back ack to drone
-                    from basestation.basestationAgent.cloud_resources import CloudResources
-                    cloud_resources = CloudResources(slice_name="basestation")
-                    cloud_resources.create_resources()
+                    cloud_resources = self.cloud_mgr.get_resources()
+                    if cloud_resources is None:
+                        status = self.cloud_mgr.create_resources()
+                        print("Cloud resources status: {}".format(status))
+                    else:
+                        print("Cloud resources already exist: {}".format(cloud_resources))
+
                     msgFromServer['missionstatus'] = "confirmed"
 
                 elif msgType == "telemetry":
@@ -256,6 +264,9 @@ class FlyPawBasestationAgent(object):
                         self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "sendVideo":
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "abortMission":
+                    # delete the cloud resources
+                    self.cloud_mgr.delete_resources()
                 else:
                     print("msgType: " + msgType)
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])

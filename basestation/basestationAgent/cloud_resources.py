@@ -1,7 +1,7 @@
-import json
-import traceback
+#!/usr/bin/env python3
 from fabrictestbed_extensions.fablib.fablib import fablib
 from fabrictestbed_extensions.fablib.resources import Resources
+from fabrictestbed_extensions.fablib.slice import Slice
 
 
 class CloudResources:
@@ -14,6 +14,15 @@ class CloudResources:
         self.site = site
         self.image = image
         self.slice_id = None
+
+    def get_resources(self) -> Slice:
+        try:
+            if self.slice_id is not None:
+                return fablib.get_slice(slice_id=self.slice_id)
+            else:
+                return fablib.get_slice(name=self.slice_name)
+        except Exception as e:
+            print(f"Exception: {e}")
 
     def get_available_resources(self) -> Resources:
         try:
