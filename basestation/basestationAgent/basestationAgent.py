@@ -105,7 +105,17 @@ class missionInfo(object):
         self.missionLeader = str #basestation, drone, cloud, edge device(s)
         self.priority = float #normalized float from 0-1
         self.planfile = str #path to planfile optional 
-        
+
+class resourceInfo(object):
+    def __init__(self):
+        self.name = str #identifier for resource
+        self.location = str #edge, cloud x, cloud y
+        self.purpose = str #mission related I guess
+        self.interface = str #thinking something like direct vs kubectl
+        self.resourceAddresses = [] #one or more ways to communicate with resource... possibly a pairing? eg ("management", "xxx.xxx.xxx.xxx")
+        self.state = str #resource reservation state
+        self.load = float #placeholder for now... maybe if we have info from prometheus or something
+    
 class VehicleCommands(object):
     def __init__(self):
         self.commands = {}
@@ -226,8 +236,10 @@ class FlyPawBasestationAgent(object):
                     #do any preflight resource reservation with Mobius, etc
                     #register flight in ACS or wherever
                     #if all good, send back ack to drone
+                    print("get resources")
                     cloud_resources = self.cloud_mgr.get_resources()
                     if cloud_resources is None:
+                        print("create resources")
                         status = self.cloud_mgr.create_resources()
                         print("Cloud resources status: {}".format(status))
                     else:
@@ -235,6 +247,29 @@ class FlyPawBasestationAgent(object):
 
                     msgFromServer['missionstatus'] = "confirmed"
 
+                elif msgType == "resourceInfo":
+                    cloud_resources = self.cloud_mgr.get_resources()
+                    print("get nodes")
+                    resourceList = []
+                    nodes = cloud_resources.get_nodes()
+                    for node in nodes:
+                        thisnode = resourceInfo()
+                        thisnode.name = node.get_name()
+                        thisnode.location = node.get_site()
+                        thisnode.interface = "direct"
+                        resourceAddress = ("Management IP", node.get_management_ip())
+                        thisnode.resourceAddresses.append(resourceAddress)
+                        thisnode.state = node.get_reservation_state()
+                        print ("name: " + thisnode.name + " location: " + thisnode.location + " interface: " + thisnode.interface + " addresstype: " + resourceAddress[0] + " address: " + str(resourceAddress[1]))
+                        #resourceList.append(thisnode)
+                    #print("list interfaces")
+                    #interfaces = cloud_resources.list_interfaces()
+                    #print(interfaces)
+                    #print("release for now!")
+                    #self.cloud_mgr.delete_resources()
+                    
+                    msgFromServer['resources'] = resourceList 
+                    
                 elif msgType == "telemetry":
                     #update your digital twin, update registry, pass on to downstream applications
                     self.handle_telemetry(clientMessage)
