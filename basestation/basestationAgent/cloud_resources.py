@@ -17,9 +17,12 @@ class CloudResources:
 
     def get_resources(self) -> Slice:
         try:
+            print("get slice_id")
             if self.slice_id is not None:
+                print("slice_id: " + str(self.slice_id))
                 return fablib.get_slice(slice_id=self.slice_id)
             else:
+                print("slice id is none. slice name: " + self.slice_name)
                 return fablib.get_slice(name=self.slice_name)
         except Exception as e:
             print(f"Exception: {e}")
