@@ -12,6 +12,22 @@ from cloud_resources import CloudResources
 #import aerpawlib
 from datetime import datetime
 
+def getMissionLibraries(mission):
+    missionLibraries = []
+    if 'missionType' in mission:
+        missiontype = mission['missionType']
+        if missiontype == "bandwidth":
+            missionLibraries.append("iperf3")
+    return missionLibraries
+
+def getMissionResourceCommands(mission):
+    missionResourceCommands = []
+    if 'missionType' in mission:
+        missiontype = mission['missionType']
+        if missiontype == "bandwidth":
+            missionResourceCommands.append("iperf3 --server -J -D --logfile iperf3.txt")
+    return missionResourceCommands
+
 def getPlanFromPlanfile(filepath):
     f = open(filepath)
     pathdata = json.load(f)
@@ -148,6 +164,7 @@ class FlyPawBasestationAgent(object):
         self.missions = []
         self.currentRequests = []
         self.iperfHistory = []
+        self.resourceList = []
         #self.drone = Drone() #our digital twin
         self.vehicleCommands = VehicleCommands()
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
@@ -165,7 +182,8 @@ class FlyPawBasestationAgent(object):
         mission.default_waypoints = processedPlan['default_waypoints']
         self.missions.append({'missionType': mission.missionType, 'missionLeader': mission.missionLeader, 'default_waypoints': mission.default_waypoints, 'priority': mission.priority})
         self.cloud_mgr = CloudResources(slice_name="base_station")
-
+        
+        
     def update_digital_twin(self, msg):
         """
         function call to update the digital twin with different types of incoming data   
@@ -232,26 +250,21 @@ class FlyPawBasestationAgent(object):
                     msgFromServer['missions'] = self.missions
                     
                 elif msgType == "acceptMission":
-                    #get final approval of DCB
-                    #do any preflight resource reservation with Mobius, etc
-                    #register flight in ACS or wherever
-                    #if all good, send back ack to drone
+                    #get cloud resources and configure to mission
                     print("get resources")
                     cloud_resources = self.cloud_mgr.get_resources()
                     if cloud_resources is None:
                         print("create resources")
                         status = self.cloud_mgr.create_resources()
                         print("Cloud resources status: {}".format(status))
+                        cloud_resources = self.cloud_mgr.get_resources()
                     else:
                         print("Cloud resources already exist: {}".format(cloud_resources))
 
-                    msgFromServer['missionstatus'] = "confirmed"
-
-                elif msgType == "resourceInfo":
-                    cloud_resources = self.cloud_mgr.get_resources()
-                    print("get nodes")
-                    resourceList = []
+                    
+                    #get nodes    
                     nodes = cloud_resources.get_nodes()
+
                     for node in nodes:
                         thisnode = resourceInfo()
                         thisnode.name = node.get_name()
@@ -261,14 +274,40 @@ class FlyPawBasestationAgent(object):
                         thisnode.resourceAddresses.append(resourceAddress)
                         thisnode.state = node.get_reservation_state()
                         print ("name: " + thisnode.name + " location: " + thisnode.location + " interface: " + thisnode.interface + " addresstype: " + resourceAddress[0] + " address: " + str(resourceAddress[1]))
-                        #resourceList.append(thisnode)
-                    #print("list interfaces")
-                    #interfaces = cloud_resources.list_interfaces()
-                    #print(interfaces)
-                    #print("release for now!")
-                    #self.cloud_mgr.delete_resources()
+                        self.resourceList.append(thisnode)
                     
-                    msgFromServer['resources'] = resourceList 
+                    #configure nodes
+
+                    """
+                    Mission Library Installation on Cloud Nodes
+                    """
+                    #need a mapping function of mission libraries to nodes... maybe for multiple missions also
+                    #for now just use the first mission and install all libraries on all nodes
+                    missionLibraries = getMissionLibraries(self.missions[0])
+                        
+                    for node in nodes:
+                        nodeName = node.get_name()
+                        print("Install Libraries for nodeName: " + nodeName)
+                        for library in missionLibraries:
+                            libraryInstallStr = "apt-get install " + library
+                            print(nodeName + ": " + libraryInstallStr)
+                            stdout, stderr = node.execute(libraryInstallStr)
+                            print(stdout)
+                    
+                    #ideally this would be coordinated be done through KubeCtl or something, but initially we'll just start up the iperf3 server in configuration
+                    missionResourceCommands = getMissionResourceCommands(self.missions[0])
+                    for node in nodes:
+                        print("Run Commands for nodeName: " + nodeName)
+                        nodeName = node.get_name()
+                        for command in missionResourceCommands:
+                            print("command: " + command)
+                            stdout, stderr = node.execute(command)
+                            print(stdout)
+                            
+                    msgFromServer['missionstatus'] = "confirmed"
+
+                elif msgType == "resourceInfo":
+                    msgFromServer['resources'] = self.resourceList 
                     
                 elif msgType == "telemetry":
                     #update your digital twin, update registry, pass on to downstream applications
