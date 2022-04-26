@@ -23,6 +23,7 @@ from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_ba
 from aerpawlib.util import VectorNED, Coordinate 
 from aerpawlib.vehicle import Vehicle
 from aerpawlib.vehicle import Drone
+from flypaw.basestation.basestationAgent import resourceInfo
 
 class Position(object):
     """
