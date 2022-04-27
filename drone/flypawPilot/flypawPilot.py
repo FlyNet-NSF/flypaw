@@ -85,7 +85,7 @@ class FlyPawPilot(StateMachine):
         self.previousSelfs = [] 
         self.missions = []
         self.missionstate = None
-        self.currentIperfObj = None
+        self.currentIperfObjArr = []
         self.communications = {}
         self.resources = []
         self.currentWaypointIndex = 0
@@ -124,7 +124,7 @@ class FlyPawPilot(StateMachine):
         """
         preflight mission assignment and various status and safety checks and registrations
         """
-
+        
         logState(self.logfiles['state'], "preflight")
         
         #certain failures cause preflight to restart so let's sleep for seconds upon entry
@@ -288,6 +288,10 @@ class FlyPawPilot(StateMachine):
                 print("external IP: " + str(externalIP))
             else:
                 print("no external IP address found for node: " + resource.name)
+
+        
+        #configureResources should block up to 5 minutes while configuring 
+        #configureResources(missionLibraries, self.resources[0])
         
         """
         keep track of previous states, starting now
@@ -526,60 +530,71 @@ class FlyPawPilot(StateMachine):
     @timed_state(name="iperf",duration = 5)
     async def iperf(self, drone: Drone):
         logState(self.logfiles['state'], "iperf")
-        x = uuid.uuid4()
-        msg = {}
-        msg['uuid'] = str(x)
-        msg['type'] = "iperfResults"
-        msg['iperfResults'] = {}
-        client = iperf3.Client()
-        client.server_hostname = self.basestationIP
-        client.port = 5201
-        client.duration = 3
-        client.json_output = True
-        result = client.run()
-        err = result.error
-        iperfPosition = getCurrentPosition(drone)
-        msg['iperfResults']['ipaddr'] = client.server_hostname
-        msg['iperfResults']['port'] = client.port
-        msg['iperfResults']['protocol'] = "tcp" #static for now
-        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
-        if err is not None:
-            msg['iperfResults']['connection'] = err
-            msg['iperfResults']['mbps'] = None
-            msg['iperfResults']['retransmits'] = None
-            msg['iperfResults']['meanrtt'] = None
-            thistime = datetime.now()
-            unixsecs = datetime.timestamp(thistime)
-            msg['iperfResults']['unixsecs'] = int(unixsecs)
-        else:
-            datarate = result.sent_Mbps
-            retransmits = result.retransmits
-            unixsecs = result.timesecs
-            result_json = result.json
-            meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
-            msg['iperfResults']['connection'] = 'ok'
-            msg['iperfResults']['mbps'] = datarate
-            msg['iperfResults']['retransmits'] = retransmits
-            msg['iperfResults']['unixsecs'] = unixsecs
-            msg['iperfResults']['meanrtt'] = meanrtt
+        iperfObjArr = []
+        for resource in self.resources:
+            externalIP = None
+            for address in resource.resourceAddresses:
+                print("address type: " + address[0])
+                if (address[0] == "Management IP"):
+                    externalIP = address[1]
+                    if externalIP is not None:
+                        x = uuid.uuid4()
+                        msg = {}
+                        msg['uuid'] = str(x)
+                        msg['type'] = "iperfResults"
+                        msg['iperfResults'] = {}
+                        client = iperf3.Client()
+                        client.server_hostname = externalIP
+                        #client.server_hostname = self.basestationIP
+                        client.port = 5201
+                        client.duration = 3
+                        client.json_output = True
+                        result = client.run()
+                        err = result.error
+                        iperfPosition = getCurrentPosition(drone)
+                        msg['iperfResults']['ipaddr'] = client.server_hostname
+                        msg['iperfResults']['port'] = client.port
+                        msg['iperfResults']['protocol'] = "tcp" #static for now
+                        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+                        if err is not None:
+                            msg['iperfResults']['connection'] = err
+                            msg['iperfResults']['mbps'] = None
+                            msg['iperfResults']['retransmits'] = None
+                            msg['iperfResults']['meanrtt'] = None
+                            thistime = datetime.now()
+                            unixsecs = datetime.timestamp(thistime)
+                            msg['iperfResults']['unixsecs'] = int(unixsecs)
+                        else:
+                            datarate = result.sent_Mbps
+                            retransmits = result.retransmits
+                            unixsecs = result.timesecs
+                            result_json = result.json
+                            meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
+                            msg['iperfResults']['connection'] = 'ok'
+                            msg['iperfResults']['mbps'] = datarate
+                            msg['iperfResults']['retransmits'] = retransmits
+                            msg['iperfResults']['unixsecs'] = unixsecs
+                            msg['iperfResults']['meanrtt'] = meanrtt
 
-        result_str = json.dumps(msg)
-        with open(self.logfiles['iperf'], "a") as ofile:
-            ofile.write(result_str + "\n")
-            ofile.close()
-        self.currentIperfObj = msg['iperfResults']
-        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
-        if serverReply is not None:
-            print(serverReply['uuid_received'])
-            if serverReply['uuid_received'] == str(x):
-                print(serverReply['type_received'] + " receipt confirmed by UUID")
-                self.communications['iperf'] = 1
-            else:
-                print(serverReply['type_received'] + " does not match our message UUID")
-                self.communications['iperf'] = 0
-        else:
-            print("no reply from server while transmitting iperfResults")
-            self.communications['iperf'] = 0
+                        result_str = json.dumps(msg)
+                        with open(self.logfiles['iperf'], "a") as ofile:
+                            ofile.write(result_str + "\n")
+                            ofile.close()
+                        iperfObjArr.append(msg['iperfResults'])
+                        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
+                        if serverReply is not None:
+                            print(serverReply['uuid_received'])
+                            if serverReply['uuid_received'] == str(x):
+                                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                                self.communications['iperf'] = 1
+                            else:
+                                print(serverReply['type_received'] + " does not match our message UUID")
+                                self.communications['iperf'] = 0
+                        else:
+                            print("no reply from server while transmitting iperfResults")
+                            self.communications['iperf'] = 0
+        #at the end append all the individual iperf results to the self array
+        self.currentIperfObjArr.append(iperfObjArr)
         return "nextAction"
 
     @state(name="sendVideo")
@@ -616,6 +631,15 @@ class FlyPawPilot(StateMachine):
     @state(name="abortMission")
     async def abortMission(self, drone: Drone):
         logState(self.logfiles['state'], "abortMission")
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "abortMission"
+        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
         #consider checking rally points 
         
         #problem with below is that it does not descend vertically.
@@ -736,6 +760,42 @@ def getResourceInfo(basestationIP):
                 return resources
     return None
 
+def configureResources(missionLibraries, resource):
+    #install any libraries needed for mission
+    x = uuid.uuid4()
+    msg = {}
+    msg['uuid'] = str(x)
+    msg['type'] = "configureResources"
+    msg['missionLibraries']= missionLibraries
+    msg['resource'] = resource
+    
+    #wait up to 5 minutes to let resources configure
+    serverReply = udpClientMsg(msg, basestationIP, 20001, 300)
+    if serverReply is not None:
+        print(serverReply['uuid_received'])
+        if serverReply['uuid_received'] == str(x):
+            if 'configured' in serverReply:
+                if serverReply['configured'] == True:
+                    return
+                else:
+                    with open(self.logfiles['error'], "a") as ofile:
+                        ofile.write("Error configuring resources. Try again later.")
+                        ofile.close()
+                        deleteResources(resources)
+                        return "preflight"
+            else:
+                with open(self.logfiles['error'], "a") as ofile:
+                        ofile.write("Error configuring resources. Try again later.")
+                        ofile.close()
+                        deleteResources(resources)
+                        return "preflight"                        
+    else:
+        with open(self.logfiles['error'], "a") as ofile:
+            ofile.write("Error configuring resources. Try again later.")
+            ofile.close()
+            deleteResources(resources)
+            return "preflight"
+                    
 def getCurrentPosition(drone: Drone):
     if drone.connected:
         pos = drone.position
