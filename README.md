@@ -1,3 +1,4 @@
+
 # flypaw
 FlyNet Experiments for the AERPAW Testbed
 
@@ -7,8 +8,7 @@ The flypaw repository shall contain tools and libraries that can be used in isol
 
 A flowchart illustrating the proposed multi-tiered architecture with some example mission objectives.  Some of this has been implemented already, some of it is placeholders.  Consider how your experiment might fit similarly!
 
-![AerPaw State Flowchart](https://user-images.githubusercontent.com/30157582/162526175-85f08f8c-70eb-45b4-ad2e-2f896eff5fd0.png)
-
+![flypaw_architecture](https://user-images.githubusercontent.com/30157582/166251625-3c03cbe1-c2c1-4b4f-a48d-49d8bf37e731.png)
 
 CURRENT REPOSITORY STRUCTURE
 
