@@ -2,11 +2,13 @@
 import socket
 import pickle
 import json
+import geojson as gj
 import sys
 
-from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, VehicleCommands
+from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands
 from cloud_resources import CloudResources
 
+sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
 #from aerpawlib.vehicle import Drone
 #from aerpawlib.vehicle import Vehicle
 #import dronekit
@@ -92,12 +94,18 @@ class FlyPawBasestationAgent(object):
         self.iperfHistory = []
         self.resourceList = []
         #self.drone = Drone() #our digital twin
+        self.droneSim = droneSim()
         self.vehicleCommands = VehicleCommands()
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
         self.vehicleCommands.setCollectVideoCommand(self.videoCollectionAgent)
         self.vehicleCommands.setSendVideoCommand(self.videoTransferAgent)
+        self.acs = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightPath"
+        self.usrname = "admin"
+        self.password = "shabiz"
+        self.updateURL = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightUpdate"
         #for mission data, we should probably be checking elsewhere... for now we'll just define a mission here:
         mission = missionInfo()
+        mission.name = "AERPAW"
         mission.missionType = "bandwidth" #"videography"
         mission.missionLeader = "drone" #or basestation or cloud
         mission.priority = 1
@@ -106,46 +114,91 @@ class FlyPawBasestationAgent(object):
         plan = getPlanFromPlanfile(mission.planfile)
         processedPlan = processPlan(plan)
         mission.default_waypoints = processedPlan['default_waypoints']
-        self.missions.append({'missionType': mission.missionType, 'missionLeader': mission.missionLeader, 'default_waypoints': mission.default_waypoints, 'priority': mission.priority})
+        self.missions.append(mission)
         self.cloud_mgr = CloudResources(slice_name="base_station")
         
         
-    def update_digital_twin(self, msg):
+    def update_digital_twin(self):
         """
         function call to update the digital twin with different types of incoming data   
         """
+        return
+    
+    def handle_telemetry(self, msg):
+        """
+        do things like send to digital twin and ACS
+        """
         if msg['type'] == "telemetry":
-            print("update twin with telemetry")
+            print("update self coordinates")
             if msg['telemetry']['position'] is not None:
-                self.drone.position.lat = msg['telemetry']['position'][0]
-                self.drone.position.lon = msg['telemetry']['position'][1]
-                self.drone.position.alt = msg['telemetry']['position'][2]
-                self.drone.position.time = msg['telemetry']['position'][3]
-            if msg['telemetry']['gps'] is not None:
-                self.drone.gps.fix_type = msg['telemetry']['gps']['fix_type']
-                self.drone.gps.satellites_visible = msg['telemetry']['gps']['satellites_visible']
+                self.droneSim.position = msg['telemetry']['position']
             if msg['telemetry']['battery'] is not None:
-                self.drone.battery.voltage = msg['telemetry']['battery']['voltage']
-                self.drone.battery.current = msg['telemetry']['battery']['current']
-                self.drone.battery.level = msg['telemetry']['battery']['level']
+                self.droneSim.battery = msg['telemetry']['battery']
             #if msg['telemetry']['attitude'] is not None:
             #self.drone.attitude.pitch = msg['telemetry']['attitude']['pitch']
             #self.drone.attitude.yaw = msg['telemetry']['attitude']['yaw']
             #self.drone.attitude.roll = msg['telemetry']['attitude']['roll']
             if msg['telemetry']['heading'] is not None:
-                self.drone.heading = msg['telemetry']['heading']
+                self.droneSim.heading = msg['telemetry']['heading']
             if msg['telemetry']['home'] is not None:
-                self.drone.home_coords.lat = msg['telemetry']['home'][0]
-                self.drone.home_coords.lon = msg['telemetry']['home'][1]
-                self.drone.home_coords.alt = msg['telemetry']['home'][2]
-        return
-    
-    def handle_telemetry(self, msg):
-        """                                                                                                                                                                                  function to apply to received telemetry message (tm in function call) from drone                                                                                                     update digital twin                                                                                                                                                                  update registration system                                                                                                                                                           """
+                self.droneSim.home_coords.lat = msg['telemetry']['home'][0]
+                self.droneSim.home_coords.lon = msg['telemetry']['home'][1]
+                self.droneSim.home_coords.alt = msg['telemetry']['home'][2]
+
         #self.update_digital_twin(msg)
-	#update_acs                                                                                                                                                                          #maybe send digital twin somewhere in the cloud for sim
+        update_acs()                                
         return
-    
+
+    def update_acs(self):
+        postData = {}
+        postData['type'] = 'Feature'
+        
+        geometry = {}
+        geometry['type'] = 'Point'
+
+        currentLocation = []
+        currentLocation.append(self.droneSim.position.lon)
+        currentLocation.append(self.droneSim.position.lat)
+        currentLocation.append(self.droneSim.position.alt)
+
+        geometry['coordinates'] = currentLocation
+        postData['geometry'] = geometry
+        
+        properties = {}
+        #just use the first mission name for now
+        properties['eventName'] = self.missions[0].name
+        properties['locationTimestamp'] = self.droneSim.position.time
+        """
+        nextWP = {}
+        nextWPGeo = {}
+        nextWPGeo['type'] = 'Point'
+        thislon = float(nextWaypoint[0])
+        thislat = float(nextWaypoint[1])
+        thisheight = float(nextWaypoint[2])
+        nextWaypoint[0] = thislon
+        nextWaypoint[1] = thislat
+        nextWaypoint[2] = thisheight
+        nextWPGeo['coordinates'] = nextWaypoint
+        nextWP['geometry'] = nextWPGeo
+        nextWP['type'] = 'Feature'
+        properties['nextWaypoint'] = nextWP
+        """
+        properties['userProperties'] = {}
+        properties['userProperties']['heading'] = self.droneSim.heading
+        postData['properties'] = properties
+        post_json_data = json.dumps(postData)
+
+        postParameters = {}
+        postParameters['json'] = post_json_data
+        flightupdateresp = requests.post(self.updateURL, auth=(self.usrname, self.password), data=postParameters)
+        updateResp = {}
+        updateResp['registrationStatusCode'] = flightupdateresp.status_code
+        #print(flightsubmitresp.status_code)
+        if flightupdateresp.status_code == 200:
+            updateResp['registration'] = "OK"
+        else:
+            updateResp['registration'] = "FAILED"
+        
     def basestationDispatch(self):
         UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         UDPServerSocket.bind((self.ipaddr, self.port))
@@ -176,7 +229,36 @@ class FlyPawBasestationAgent(object):
                     msgFromServer['missions'] = self.missions
                     
                 elif msgType == "acceptMission":
+
+                    #register in ACS  (once it's working move it down below the get resources
+                    
+                    """
+                    ACS registration
+                    """
+                    print("register in ACS")
+                    
+                    lineString = gj.LineString(mission['default_waypoints'])
+                    userProperties = {}
+                    featureList = []
+                    userProperties['classification'] = "scheduledFlight";
+                    eventName = mission.name
+                    feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
+                    featureList.append(feature)
+                    fc = gj.FeatureCollection(featureList)
+                    dumpFC = gj.dumps(fc, sort_keys=True)
+                    FC_data = {'json': dumpFC}
+                    flightsubmitresp = requests.post(self.acs, auth=(self.usrname, self.password), data=FC_data)
+                    registerResp = {}
+                    registerResp['registrationStatusCode'] = flightsubmitresp.status_code
+                    print(flightsubmitresp.status_code)
+                    if flightsubmitresp.status_code == 200:
+                        registerResp['registration'] = "OK"
+                    else:
+                        registerResp['registration'] = "FAILED"
+
+                    
                     #get cloud resources and configure to mission
+                    """
                     print("get resources")
                     cloud_resources = self.cloud_mgr.get_resources()
                     if cloud_resources is None:
@@ -201,11 +283,12 @@ class FlyPawBasestationAgent(object):
                         thisnode.state = node.get_reservation_state()
                         print ("name: " + thisnode.name + " location: " + thisnode.location + " interface: " + thisnode.interface + " addresstype: " + resourceAddress[0] + " address: " + str(resourceAddress[1]))
                         self.resourceList.append(thisnode)
-                    
+                    """
                     #configure nodes
 
                     """
                     Mission Library Installation on Cloud Nodes
+                    """
                     """
                     #need a mapping function of mission libraries to nodes... maybe for multiple missions also
                     #for now just use the first mission and install all libraries on all nodes
@@ -215,10 +298,11 @@ class FlyPawBasestationAgent(object):
                         nodeName = node.get_name()
                         print("Install Libraries for nodeName: " + nodeName)
                         for library in missionLibraries:
-                            libraryInstallStr = "apt-get install " + library
+                            libraryInstallStr = "sudo yum -y install " + library
                             print(nodeName + ": " + libraryInstallStr)
                             stdout, stderr = node.execute(libraryInstallStr)
                             print(stdout)
+                            print(stderr)
                     
                     #ideally this would be coordinated be done through KubeCtl or something, but initially we'll just start up the iperf3 server in configuration
                     missionResourceCommands = getMissionResourceCommands(self.missions[0])
@@ -229,9 +313,11 @@ class FlyPawBasestationAgent(object):
                             print("command: " + command)
                             stdout, stderr = node.execute(command)
                             print(stdout)
-                            
+                            print(stderr)
+                    """
                     msgFromServer['missionstatus'] = "confirmed"
 
+                    
                 elif msgType == "resourceInfo":
                     msgFromServer['resources'] = self.resourceList 
                     
