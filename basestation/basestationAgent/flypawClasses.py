@@ -1,7 +1,36 @@
 #!/usr/bin/env python3
 import json
 
+class Position(object):
+    """
+    lon: float units degrees (-180..180)
+    lat: float units degrees (-90..90)
+    alt: float units M AGL
+    time: str, iso8601 currently
+    fix_type: int (0..4), 0-1 = no fix, 2 = 2D fix, 3 = 3D fix
+    satellites_visible: int (0..?)
+    """
+    def __init__(self):
+        self.lon = float
+        self.lat = float
+        self.alt = float
+        self.time = str
+        self.fix_type = int
+        self.satellites_visible = int
 
+class Battery(object):
+    """
+    voltage: float units V
+    current: float units mA
+    level: int unitless (0-100)
+    m_kg: battery mass, units kg
+    """
+    def __init__(self):
+        self.voltage = float
+        self.current = float
+        self.level = float
+        self.m_kg = float
+        
 class iperfInfo(object):
     def __init__(self, ipaddr="172.16.0.1", port=5201, protocol="tcp", priority=0, mbps=0, meanrtt=0):
         self.ipaddr = ipaddr #string server ip address
@@ -47,7 +76,8 @@ class missionInfo(object):
         self.missionLeader = str #basestation, drone, cloud, edge device(s)
         self.priority = float #normalized float from 0-1
         self.planfile = str #path to planfile optional 
-
+        self.name = str #the name of the mission
+        
 class resourceInfo(object):
     def __init__(self):
         self.name = str #identifier for resource
@@ -77,3 +107,10 @@ class VehicleCommands(object):
     def setMissionCommand(self, missionObj):
         self.commands['mission'] = { "command": "mission", "defaultWaypoints": missionObj.defaultWaypoints, "missionType": missionObj.missionType, "missionControl": missionObj.missionControl, "priority": missionObj.priority }
 
+class droneSim(object):
+    def __init__(self):
+        self.position = Position()
+        self.nextWaypoint = Position()
+        self.battery = Battery()
+        self.heading = float
+        self.home = []
