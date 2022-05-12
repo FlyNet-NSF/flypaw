@@ -23,48 +23,11 @@ from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_ba
 from aerpawlib.util import VectorNED, Coordinate 
 from aerpawlib.vehicle import Vehicle
 from aerpawlib.vehicle import Drone
-from flypaw.basestation.basestationAgent import resourceInfo
 
-sys.path.append('/root/flypaw/basestation/basestationAgent')
-import basestationAgent
+sys.path.append('/root/elyons/flypaw/basestation/basestationAgent')
+from flypawClasses import resourceInfo, missionInfo, Position, Battery
+#import flypawClasses
 
-class Position(object):
-    """
-    lon: float units degrees (-180..180)
-    lat: float units degrees (-90..90)
-    alt: float units M AGL
-    time: str, iso8601 currently 
-    fix_type: int (0..4), 0-1 = no fix, 2 = 2D fix, 3 = 3D fix
-    satellites_visible: int (0..?)
-    """
-    def __init__(self):
-        self.lon = float
-        self.lat = float
-        self.alt = float
-        self.time = str 
-        self.fix_type = int
-        self.satellites_visible = int
-
-class Battery(object):
-    """
-    voltage: float units V
-    current: float units mA
-    level: int unitless (0-100)
-    m_kg: battery mass, units kg
-    """
-    def __init__(self):
-        self.voltage = float
-        self.current = float
-        self.level = float
-        self.m_kg = float 
-
-
-class missionInfo(object):
-    def __init__(self):
-        self.defaultWaypoints = [] #planfile  
-        self.missionType = str #videography, delivery, air taxi, etc.
-        self.missionLeader = str #basestation, drone, cloud, edge device(s)
-        self.priority = float #normalized float from 0-1
 """
 class resourceInfo(object):
     def __init__(self):
@@ -176,14 +139,13 @@ class FlyPawPilot(StateMachine):
             return "preflight"
 
 
-        """                                                                                                                                                          
+        """ 
         Network Check
         TBD--> Placeholder for now... Maybe check your throughput from that pad, or make it a networking system test (UE) rather than iperf
         """
         self.currentIperfObj = None
 
 
-        #### now request a mission from the basestation
         """
         Mission Check
         TBD--> develop high level mission overview checks
@@ -198,16 +160,16 @@ class FlyPawPilot(StateMachine):
             return "preflight"
 
         """
-        Equipment Check
-        TBD--> Mission specific gear check.  Eg. Video mission should check camera status
+        Home Check
         """
-        if not checkEquipment(self.missions[0]):
-            print("Equipment not reporting correctly.  Please check")
+        self.currentHome = drone.home_coords
+        if self.currentHome is None:
+            print("Please ensure home position is set properly")
             with open(self.logfiles['error'], "a") as ofile:
-                ofile.write("Equipment not reporting correctly.  Please check")
+                ofile.write("Please ensure home position is set properly")
                 ofile.close()
             return "preflight"
-
+        
         """
         Airspace Check
         TBD--> A placeholder for future important concepts like weather checks and UVRs.  Traffic also checked with DCB later
@@ -220,6 +182,17 @@ class FlyPawPilot(StateMachine):
                 ofile.close()
             return "preflight"
 
+        """
+        Equipment Check
+        TBD--> Mission specific gear check.  Eg. Video mission should check camera status
+        """
+        if not checkEquipment(self.missions[0]):
+            print("Equipment not reporting correctly.  Please check")
+            with open(self.logfiles['error'], "a") as ofile:
+                ofile.write("Equipment not reporting correctly.  Please check")
+                ofile.close()
+            return "preflight"
+        
         ####Could check for availability of resources before accepting mission, but may make more sense to rely on basestation for this...
         """
         Cloud Resources Check
@@ -368,21 +341,10 @@ class FlyPawPilot(StateMachine):
                     time.sleep(1)
             else:
                 #position seems fine
-                #try to report it (maybe only if you aren't the mission leader?)
-                #if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":
-                print("report position to basestation")
-                recv = await self.reportPositionUDP()
-                if (recv):
-                #denote that you had connectivity here for that spot
-                    print("report position to basestation confirmed")
-                    self.communications['reportPositionUDP'] = 1
-                else:
-                    self.communications['reportPositionUDP'] = 0
-                    print("no reply from server while transmitting position")
-                    
+                print("position is communicating")
                 statusAttempt = 0
                 break
-        
+               
         while True:
             print("check battery.  Attempt: " + str(statusAttempt))
             self.currentBattery = getCurrentBattery(drone)
@@ -400,13 +362,21 @@ class FlyPawPilot(StateMachine):
             else:
                 #battery seems fine
                 print("battery is communicating")
-                statusAttempt =	0
+                statusAttempt = 0
                 break
-            
         
         #self.currentAttitude = getCurrentAttitude(drone)
         self.currentHeading = drone.heading
 
+        print ("report telemetry and battery status")
+        recv = await self.reportPositionUDP()
+        if (recv):
+            print("report position to basestation confirmed")
+            self.communications['reportPositionUDP'] = 1
+        else:
+            self.communications['reportPositionUDP'] = 0
+            print("no reply from server while transmitting position")
+       
         #check for mission actions to be performed at the start of this state
         self.nextStates = getEntryMissionActions(self.missions[0]['missionType'])
 
@@ -545,7 +515,7 @@ class FlyPawPilot(StateMachine):
                         msg['type'] = "iperfResults"
                         msg['iperfResults'] = {}
                         client = iperf3.Client()
-                        client.server_hostname = externalIP
+                        client.server_hostname = str(externalIP)
                         #client.server_hostname = self.basestationIP
                         client.port = 5201
                         client.duration = 3
@@ -690,18 +660,8 @@ class FlyPawPilot(StateMachine):
         msg['uuid'] = str(x)
         msg['type'] = "telemetry"
         msg['telemetry'] = {}
-        msg['telemetry']['position'] = []
-        msg['telemetry']['position'].append(self.currentPosition.lat)
-        msg['telemetry']['position'].append(self.currentPosition.lon)
-        msg['telemetry']['position'].append(self.currentPosition.alt)
-        msg['telemetry']['position'].append(self.currentPosition.time)
-        msg['telemetry']['gps'] = {}
-        msg['telemetry']['gps']['satellites_visible'] = self.currentPosition.satellites_visible
-        msg['telemetry']['gps']['fix_type'] = self.currentPosition.fix_type
-        msg['telemetry']['battery'] = {}
-        msg['telemetry']['battery']['voltage'] = self.currentBattery.voltage
-        msg['telemetry']['battery']['current'] = self.currentBattery.current
-        msg['telemetry']['battery']['level'] = self.currentBattery.level
+        msg['telemetry']['position'] = self.currentPosition
+        msg['telemetry']['battery'] = self.currentBattery
         #msg['telemetry']['attitude'] = {} 
         #msg['telemetry']['attitude']['pitch'] = self.currentAttitude['pitch']
         #msg['telemetry']['attitude']['yaw'] = self.currentAttitude['yaw']
@@ -711,7 +671,7 @@ class FlyPawPilot(StateMachine):
         msg['telemetry']['home'].append(self.currentHome.lat)
         msg['telemetry']['home'].append(self.currentHome.lon)
         msg['telemetry']['home'].append(self.currentHome.alt)
-        
+
         #log telemetry
         result_str = json.dumps(msg)
         with open(self.logfiles['telemetry'], "a") as ofile:
