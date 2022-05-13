@@ -110,7 +110,7 @@ class VehicleCommands(object):
 class droneSim(object):
     def __init__(self):
         self.position = Position()
-        self.nextWaypoint = Position()
+        self.nextWaypoint = []
         self.battery = Battery()
         self.heading = float
         self.home = []

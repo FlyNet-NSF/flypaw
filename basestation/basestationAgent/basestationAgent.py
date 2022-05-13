@@ -4,11 +4,15 @@ import pickle
 import json
 import geojson as gj
 import sys
+import pytz
+import requests
 
-from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands
+from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
+
 from cloud_resources import CloudResources
 
-sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
+#sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
+#from aerpawlib.util import Coordinate
 #from aerpawlib.vehicle import Drone
 #from aerpawlib.vehicle import Vehicle
 #import dronekit
@@ -141,12 +145,13 @@ class FlyPawBasestationAgent(object):
             if msg['telemetry']['heading'] is not None:
                 self.droneSim.heading = msg['telemetry']['heading']
             if msg['telemetry']['home'] is not None:
-                self.droneSim.home_coords.lat = msg['telemetry']['home'][0]
-                self.droneSim.home_coords.lon = msg['telemetry']['home'][1]
-                self.droneSim.home_coords.alt = msg['telemetry']['home'][2]
-
+                self.droneSim.home = msg['telemetry']['home']
+            if msg['telemetry']['nextWaypoint'] is not None:
+                self.droneSim.nextWaypoint = msg['telemetry']['nextWaypoint']
+            
         #self.update_digital_twin(msg)
-        update_acs()                                
+        acsUpdate = self.update_acs()
+        print(acsUpdate)
         return
 
     def update_acs(self):
@@ -162,27 +167,30 @@ class FlyPawBasestationAgent(object):
         currentLocation.append(self.droneSim.position.alt)
 
         geometry['coordinates'] = currentLocation
+        #geometry['coordinates'] = self.droneSim.position
         postData['geometry'] = geometry
         
         properties = {}
         #just use the first mission name for now
         properties['eventName'] = self.missions[0].name
         properties['locationTimestamp'] = self.droneSim.position.time
-        """
+        
         nextWP = {}
         nextWPGeo = {}
         nextWPGeo['type'] = 'Point'
-        thislon = float(nextWaypoint[0])
-        thislat = float(nextWaypoint[1])
-        thisheight = float(nextWaypoint[2])
-        nextWaypoint[0] = thislon
-        nextWaypoint[1] = thislat
-        nextWaypoint[2] = thisheight
-        nextWPGeo['coordinates'] = nextWaypoint
+        #nextWaypoint = []
+        #nextWaypoint.append(self.droneSim.nextWaypoint.lon)
+	#nextWaypoint.append(self.droneSim.nextWaypoint.lat)
+	#nextWaypoint.append(self.droneSim.nextWaypoint.alt)
+        #nextWPGeo['coordinates'] = nextWaypoint
+        nextWPGeo['coordinates'] = []
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[0])
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[1])
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[2])
+        
         nextWP['geometry'] = nextWPGeo
         nextWP['type'] = 'Feature'
-        properties['nextWaypoint'] = nextWP
-        """
+        properties['nextWaypoint'] = nextWP        
         properties['userProperties'] = {}
         properties['userProperties']['heading'] = self.droneSim.heading
         postData['properties'] = properties
@@ -198,7 +206,8 @@ class FlyPawBasestationAgent(object):
             updateResp['registration'] = "OK"
         else:
             updateResp['registration'] = "FAILED"
-        
+        return updateResp['registration']
+            
     def basestationDispatch(self):
         UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         UDPServerSocket.bind((self.ipaddr, self.port))
@@ -237,11 +246,20 @@ class FlyPawBasestationAgent(object):
                     """
                     print("register in ACS")
                     
-                    lineString = gj.LineString(mission['default_waypoints'])
+                    lineString = gj.LineString(self.missions[0].default_waypoints)
                     userProperties = {}
                     featureList = []
                     userProperties['classification'] = "scheduledFlight";
-                    eventName = mission.name
+                    eventName = self.missions[0].name
+                    #utcnow = datetime.utcnow()
+                    #startTime = utcnow.isoformat(sep='T')
+                    currentUnixsecs = datetime.now(tz=pytz.UTC).timestamp()
+                    laterUnixsecs = currentUnixsecs + 1800 #half an hour from now
+                    currentDT = datetime.fromtimestamp(currentUnixsecs, tz=pytz.UTC)
+                    laterDT = datetime.fromtimestamp(laterUnixsecs, tz=pytz.UTC)
+                    startTime = currentDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+                    endTime = laterDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
                     feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
                     featureList.append(feature)
                     fc = gj.FeatureCollection(featureList)
