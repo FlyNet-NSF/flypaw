@@ -46,6 +46,7 @@ class FlyPawPilot(StateMachine):
         self.currentBattery = Battery()
         self.currentHeading = None
         self.currentHome = None
+        self.nextWaypoint = []
         self.previousSelfs = [] 
         self.missions = []
         self.missionstate = None
@@ -151,6 +152,7 @@ class FlyPawPilot(StateMachine):
         TBD--> develop high level mission overview checks
         """
         self.missions = getMissions(self.basestationIP) #should probably include the position and battery and home info when asking for missions... may preclude some missions
+        
         if not self.missions:
             print("No assignment... will check again in 2 seconds")
             with open(self.logfiles['error'], "a") as ofile:
@@ -158,7 +160,14 @@ class FlyPawPilot(StateMachine):
                 ofile.close()
             #time.sleep(2)
             return "preflight"
-
+        else:
+            print("number of missions: " + str(len(self.missions)))
+            for thisMission in self.missions:
+                print("mission type: " + thisMission.missionType + " leader: " + thisMission.missionLeader + " priority: " + str(thisMission.priority))
+                #print out waypoints
+                for waypoint in thisMission.default_waypoints:
+                    print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2]))
+                    
         """
         Home Check
         """
@@ -175,7 +184,7 @@ class FlyPawPilot(StateMachine):
         TBD--> A placeholder for future important concepts like weather checks and UVRs.  Traffic also checked with DCB later
         For now just use the first mission
         """
-        if not checkAirspace(self.missions[0]['default_waypoints']):
+        if not checkAirspace(self.missions[0].default_waypoints):
             print("Airspace not fit for flying, check back later")
             with open(self.logfiles['error'], "a") as ofile:
                 ofile.write("Airspace not fit for flying, check back later")
@@ -219,18 +228,11 @@ class FlyPawPilot(StateMachine):
         
         #likely a lot more to check... 
 
-        #print out missions
-        for mission in self.missions:            
-            print("mission: " + self.missions[0]['missionType'] + " leader: " + self.missions[0]['missionLeader'] + " priority: " + str(self.missions[0]['priority'] ))
-            #print out waypoints
-            for waypoint in self.missions[0]['default_waypoints']:
-                print (str(waypoint[1]) + " " + str(waypoint[0]) + " " + str(waypoint[2])) 
-
         #ok, try to accept mission
         print("accepting mission... this can take up to 5 minutes to get confirmation while cloud resources are reserved")
         missionAccepted = acceptMission(self.basestationIP, self.missions[0])
         if missionAccepted:
-            print (self.missions[0]['missionType'] + " mission accepted")
+            print (self.missions[0].missionType + " mission accepted")
             
             #check start time of mission
             #check current time
@@ -293,8 +295,8 @@ class FlyPawPilot(StateMachine):
         print("takeoff")
         
         #takeoff to height of the first waypoint or 25 meters, whichever is higher                                                                                                
-        if len(self.missions[0]['default_waypoints']) > 1:
-            target_alt = self.missions[0]['default_waypoints'][1][2]
+        if len(self.missions[0].default_waypoints) > 1:
+            target_alt = self.missions[0].default_waypoints[1][2]
         else:
             print("recheck your mission")
             with open(self.logfiles['error'], "a") as ofile:
@@ -367,7 +369,18 @@ class FlyPawPilot(StateMachine):
         
         #self.currentAttitude = getCurrentAttitude(drone)
         self.currentHeading = drone.heading
+        
 
+        #lets look at our next waypoint right away... don't love putting this here
+        if not len(self.missions[0].default_waypoints) > (self.currentWaypointIndex + 1):
+            print("no more waypoints... go home if not already there and land")  
+            return "abortMission"
+
+        self.nextWaypoint = []
+        self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][0])
+        self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][1])
+        self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][2])
+         
         print ("report telemetry and battery status")
         recv = await self.reportPositionUDP()
         if (recv):
@@ -378,7 +391,7 @@ class FlyPawPilot(StateMachine):
             print("no reply from server while transmitting position")
        
         #check for mission actions to be performed at the start of this state
-        self.nextStates = getEntryMissionActions(self.missions[0]['missionType'])
+        self.nextStates = getEntryMissionActions(self.missions[0].missionType)
 
         #move onto the next pending task or default task
         return "nextAction"
@@ -389,11 +402,11 @@ class FlyPawPilot(StateMachine):
         logState(self.logfiles['state'], "flight")
         #check if we have enough to go, at minimum, from here to the next default waypoint and to home
         print ("check for sufficient battery... note, no good way to do this yet, so it's a placeholder")
-        if not len(self.missions[0]['default_waypoints']) > (self.currentWaypointIndex + 1):
+        if not len(self.missions[0].default_waypoints) > (self.currentWaypointIndex + 1):
             print("no more waypoints... go home if not already there and land")
             return "abortMission"
 
-        battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1])
+        battery_check = checkBattery(self.currentBattery, self.currentPosition, self.currentHome, self.missions[0].default_waypoints[self.currentWaypointIndex + 1])
         if not battery_check:
             print("battery check fail")
             with open(self.logfiles['error'], "a") as ofile:
@@ -401,7 +414,7 @@ class FlyPawPilot(StateMachine):
                 ofile.close()
             return "abortMission"
 
-        defaultNextCoord = Coordinate(self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][2])
+        defaultNextCoord = Coordinate(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][1], self.missions[0].default_waypoints[self.currentWaypointIndex + 1][0], self.missions[0].default_waypoints[self.currentWaypointIndex + 1][2])
         
 
         ##set heading... unnecessary unless we want to have a heading other than the direction of motion 
@@ -431,7 +444,7 @@ class FlyPawPilot(StateMachine):
                     statusAttempt = 0
                     break
             
-            geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][1], self.missions[0]['default_waypoints'][self.currentWaypointIndex + 1][0], 1025)
+            geodesic_dx = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.missions[0].default_waypoints[self.currentWaypointIndex + 1][1], self.missions[0].default_waypoints[self.currentWaypointIndex + 1][0], 1025)
             flight_dx_from_here = geodesic_dx.get('s12')
             print(str(self.currentPosition.lat) + " " + str(self.currentPosition.lon) + " " + str(self.currentPosition.alt))
             #get within 5 meters?                                                                                                                                     
@@ -618,7 +631,7 @@ class FlyPawPilot(StateMachine):
         #    await drone.goto_coordinates(self.currentHome)
 
         #another option... go to waypoint 1 for now which should be over the home position
-        #overHomePositionCoord = Coordinate(self.missions[0]['default_waypoints'][1][1], self.missions[0]['default_waypoints'][1][0], self.missions[0]['default_waypoints'][1][2])
+        #overHomePositionCoord = Coordinate(self.missions[0].default_waypoints[1][1], self.missions[0].default_waypoints[1][0], self.missions[0].default_waypoints[1][2])
         overHomePositionCoord = Coordinate(self.currentHome.lat, self.currentHome.lon, 30)
         #drone.set_heading(bearing_from_here)
         await drone.goto_coordinates(overHomePositionCoord)
@@ -646,9 +659,8 @@ class FlyPawPilot(StateMachine):
         #if basestation or cloud is the leader, return instruction request as default
 
         if self.missions:
-            if "missionLeader" in self.missions[0]:
-                if self.missions[0]['missionLeader'] == "basestation" or self.missions[0]['missionLeader'] == "cloud":
-                    return "instructionRequest"
+            if self.missions[0].missionLeader == "basestation" or self.missions[0].missionLeader == "cloud":
+                return "instructionRequest"
         #if drone is the missionLeader, return flight
         return "flight"
     
@@ -671,13 +683,36 @@ class FlyPawPilot(StateMachine):
         msg['telemetry']['home'].append(self.currentHome.lat)
         msg['telemetry']['home'].append(self.currentHome.lon)
         msg['telemetry']['home'].append(self.currentHome.alt)
+        msg['telemetry']['nextWaypoint'] = self.nextWaypoint
 
         #log telemetry
-        result_str = json.dumps(msg)
+        print("logging telemetry")
+        """
+        teleJson = {}
+        teleJson['position'] = {}
+        teleJson['position']['lat'] = self.currentPosition.lat
+        teleJson['position']['lon'] = self.currentPosition.lon
+        teleJson['position']['alt'] = self.currentPosition.alt
+        teleJson['position']['time'] = self.currentPosition.time
+        teleJson['position']['fix_type'] = self.currentPosition.fix_type
+        teleJson['position']['satellites_visible'] = self.currentPosition.satellites_visible
+        teleJson['battery'] = {}
+        teleJson['battery']['voltage'] = self.currentBattery.voltage
+        teleJson['battery']['current'] = self.currentBattery.current
+        teleJson['battery']['level'] = self.currentBattery.level
+        #teleJson['battery']['m_kg'] = self.currentBattery.m_kg
+        teleJson['heading'] = self.currentHeading
+        teleJson['home'] = []
+        teleJson['home'].append(self.currentHome.lat)
+        teleJson['home'].append(self.currentHome.lon)
+        teleJson['home'].append(self.currentHome.alt)
+        result_str = json.dumps(teleJson)
+            
         with open(self.logfiles['telemetry'], "a") as ofile:
-            ofile.write(result_str + "\n")
+            ofile.write(result_str)
             ofile.close()
-      
+        """
+        print("sending telemetry")
         serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
         if serverReply is not None:
             #print(serverReply) 
@@ -765,7 +800,7 @@ def getCurrentPosition(drone: Drone):
         thisPosition.lat = pos.lat
         thisPosition.lon = pos.lon
         thisPosition.alt = pos.alt
-        thisPosition.time = datetime.now().astimezone().isoformat()
+        thisPosition.time = datetime.now().astimezone().isoformat(timespec='seconds')
         thisPosition.fix_type = gps.fix_type
         thisPosition.satellites_visible = gps.satellites_visible
         return thisPosition
