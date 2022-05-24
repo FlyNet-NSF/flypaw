@@ -687,7 +687,7 @@ class FlyPawPilot(StateMachine):
 
         #log telemetry
         print("logging telemetry")
-        """
+        
         teleJson = {}
         teleJson['position'] = {}
         teleJson['position']['lat'] = self.currentPosition.lat
@@ -711,7 +711,7 @@ class FlyPawPilot(StateMachine):
         with open(self.logfiles['telemetry'], "a") as ofile:
             ofile.write(result_str)
             ofile.close()
-        """
+        
         print("sending telemetry")
         serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
         if serverReply is not None:
