@@ -1,12 +1,91 @@
-export FABRIC_CREDMGR_HOST='cm.fabric-testbed.net'
-export FABRIC_ORCHESTRATOR_HOST='orchestrator.fabric-testbed.net'
-export FABRIC_BASTION_HOST="bastion-1.fabric-testbed.net"
+runtime:
+  slice_name: mb_slice
+  slice-private-key-location: /root/elyons/fabric_sliver_key
+  slice-public-key-location: /root/elyons/fabric_sliver_key.pub
 
-# Set your Bastion username and private key
-export FABRIC_BASTION_USERNAME="elyons_0014987716"
-export FABRIC_BASTION_KEY_LOCATION="/root/elyons/fabric_bastion_key"
-export FABRIC_TOKEN_LOCATION="/root/elyons/tokens.json"
+resources:
+    # To provision resources on multiple sites at FABRIC;
+    # just copy and add additional resource block for different site
+    - resource:
+        type: VM
+        site: FABRIC.RANDOM # change to specific SITE if needed
+        count: 0 # Increase as needed
+        image: default_rocky_8
+        nic_model: NIC_Basic # NIC_Basic(SRIOV), NIC_ConnectX_5 => 25GB, NIC_ConnectX_6 => 100GB
+        name_prefix: node
+        network:
+          type: IPv6 # Allowed values IPv4 or IPv6
+        flavor:
+          cores: 2
+          ram: 8
+          disk: 10
+    # To provision resources on multiple sites at Chameleon;
+    # just copy and add additional resource block for different site
+    - resource:
+        type: Baremetal
+        site: KVM@TACC # Possible values => KVM@TACC, CHI@TACC and CHI@UC
+        count: 1 # Increase as needed
+        image: CC-CentOS8
+        network:
+          type: sharednet1 # Possible values: sharednet1(when creating nodes on single site),
+                           # sharedwan1 (when creating nodes on multiple CHI sites)
+        name_prefix: node
+        flavor:
+          name: m1.large
+                           # Possible values (e.g. compute_cascadelake, compute_cascadelake_r, compute_skylake, ) for CHI@UC and CHI@TACC.
+                           # More details for CHI@UC and CHI@TACC here https://www.chameleoncloud.org/hardware/
+                           # Possible values (e.g: m1.tiny => CPU(1), RAM(512MB) Disk(1GB), m1.small => CPU(1), RAM(2GB) Disk(20GB),
+                           # m1.medium => CPU(2), RAM(4GB) Disk(40GB), m1.large => CPU(4), RAM(8GB) Disk(40GB),
+                           # m1.xlarge => CPU(8), RAM(16GB) Disk(40GB)) for KVM@TACC.
+                           # More details for KVM@TACC here: https://chameleoncloud.readthedocs.io/en/latest/technical/kvm.html#launching-instances
 
-# Set the keypair FABRIC will install in your slice.
-export FABRIC_SLICE_PRIVATE_KEY_FILE="/root/elyons/fabric_sliver_key"
-export FABRIC_SLICE_PUBLIC_KEY_FILE="/root/elyons/fabric_sliver_key.pub"
+fabric:
+  oc-host: orchestrator.fabric-testbed.net
+  cm-host: cm.fabric-testbed.net
+  # Tokens are user specific are must be downloaded before provisioning resources on FABRIC from https://portal.fabric-testbed.net/ via Experiments -> Manage Tokens
+  token-location: /root/elyons/tokens.json
+
+  bastion-host: bastion-1.fabric-testbed.net
+  # User must create a Bastion Key and User before provisioning resources on FABRIC from https://portal.fabric-testbed.net/ via Experiments -> Manage SSH Keys
+  bastion-user-name: elyons_0014987716
+
+  # Path to the Bastion private key created from https://portal.fabric-testbed.net/ via Experiments -> Manage SSH Keys
+  bastion-key-location: /root/elyons/fabric_bastion_key
+
+  # FABRIC Project Id can be found from https://portal.fabric-testbed.net/ via Projects tab
+  project_id: b9847fa1-13ef-49f9-9e07-ae6ad06cda3f
+
+chameleon:
+  # Chameleon user name
+  user: kthare10
+  # Create a CLI Password as described here: https://chameleoncloud.readthedocs.io/en/latest/technical/cli.html
+  password:
+  auth_url:
+    tacc: https://chi.tacc.chameleoncloud.org:5000/v3
+    uc: https://chi.uc.chameleoncloud.org:5000/v3
+    kvm: https://kvm.tacc.chameleoncloud.org:5000/v3
+    edge: https://chi.edge.chameleoncloud.org:5000/v3
+  client_id:
+    tacc: keystone-tacc-prod
+    uc: keystone-uc-prod
+    kvm: keystone-kvm-prod
+    edge: keystone-edge-prod
+  key_pair: kthare10
+  # Specify the Project Name can be found https://www.chameleoncloud.org/
+  project_name: CH-822154
+  # Specify the Project Id for each region can be found by going to https://www.chameleoncloud.org/
+  # Then Click Experiment and select the specific site
+  # Go to Identity -> Projects and grab the project id
+  project_id:
+    tacc: a400724e818d40cbba1a5c6b5e714462
+    uc: ae76673270164b048b59d3bd30676721
+    kvm: a400724e818d40cbba1a5c6b5e714462
+    edge:
+
+
+logging:
+  log-file: ./mobius.log
+  log-level: INFO
+  log-retain: 5
+  log-size: 5000000
+  logger: mobius

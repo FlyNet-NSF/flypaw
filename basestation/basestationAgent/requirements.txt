@@ -1,1 +1,1 @@
-mobius-py
+mobius-py==1.1

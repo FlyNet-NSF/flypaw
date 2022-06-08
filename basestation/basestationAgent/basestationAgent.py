@@ -6,6 +6,7 @@ import geojson as gj
 import sys
 import pytz
 import requests
+from mobius.controller.controller import Controller
 
 from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
 
@@ -119,9 +120,8 @@ class FlyPawBasestationAgent(object):
         processedPlan = processPlan(plan)
         mission.default_waypoints = processedPlan['default_waypoints']
         self.missions.append(mission)
-        self.cloud_mgr = CloudResources(slice_name="base_station")
-        
-        
+        self.cloud_mgr = Controller(config_file_location="./config.yml")
+
     def update_digital_twin(self):
         """
         function call to update the digital twin with different types of incoming data   
@@ -274,67 +274,45 @@ class FlyPawBasestationAgent(object):
                     else:
                         registerResp['registration'] = "FAILED"
 
-                    
                     #get cloud resources and configure to mission
-                    """
-                    print("get resources")
-                    cloud_resources = self.cloud_mgr.get_resources()
-                    if cloud_resources is None:
-                        print("create resources")
-                        status = self.cloud_mgr.create_resources()
-                        print("Cloud resources status: {}".format(status))
-                        cloud_resources = self.cloud_mgr.get_resources()
-                    else:
-                        print("Cloud resources already exist: {}".format(cloud_resources))
+                    self.cloud_mgr.create()
+                    slices = self.cloud_mgr.get_resources()
+                    for s in slices:
+                        print(s)
 
-                    
-                    #get nodes    
-                    nodes = cloud_resources.get_nodes()
-
-                    for node in nodes:
-                        thisnode = resourceInfo()
-                        thisnode.name = node.get_name()
-                        thisnode.location = node.get_site()
-                        thisnode.interface = "direct"
-                        resourceAddress = ("Management IP", node.get_management_ip())
-                        thisnode.resourceAddresses.append(resourceAddress)
-                        thisnode.state = node.get_reservation_state()
-                        print ("name: " + thisnode.name + " location: " + thisnode.location + " interface: " + thisnode.interface + " addresstype: " + resourceAddress[0] + " address: " + str(resourceAddress[1]))
-                        self.resourceList.append(thisnode)
-                    """
-                    #configure nodes
-
+                    # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
                     """
-                    """
-                    #need a mapping function of mission libraries to nodes... maybe for multiple missions also
-                    #for now just use the first mission and install all libraries on all nodes
+                    # need a mapping function of mission libraries to nodes... maybe for multiple missions also
+                    # for now just use the first mission and install all libraries on all nodes
                     missionLibraries = getMissionLibraries(self.missions[0])
-                        
-                    for node in nodes:
-                        nodeName = node.get_name()
-                        print("Install Libraries for nodeName: " + nodeName)
-                        for library in missionLibraries:
-                            libraryInstallStr = "sudo yum -y install " + library
-                            print(nodeName + ": " + libraryInstallStr)
-                            stdout, stderr = node.execute(libraryInstallStr)
-                            print(stdout)
-                            print(stderr)
-                    
-                    #ideally this would be coordinated be done through KubeCtl or something, but initially we'll just start up the iperf3 server in configuration
-                    missionResourceCommands = getMissionResourceCommands(self.missions[0])
-                    for node in nodes:
-                        print("Run Commands for nodeName: " + nodeName)
-                        nodeName = node.get_name()
-                        for command in missionResourceCommands:
-                            print("command: " + command)
-                            stdout, stderr = node.execute(command)
-                            print(stdout)
-                            print(stderr)
-                    """
-                    msgFromServer['missionstatus'] = "confirmed"
 
+                    for s in slices:
+                        for node in s.get_nodes():
+                            nodeName = node.get_name()
+                            print("Install Libraries for nodeName: " + nodeName)
+                            for library in missionLibraries:
+                                libraryInstallStr = "sudo yum -y install " + library
+                                print(nodeName + ": " + libraryInstallStr)
+                                stdout, stderr = node.execute(libraryInstallStr)
+                                print(stdout)
+                                print(stderr)
+
+                    # ideally this would be coordinated be done through KubeCtl or something, but initially we'll 
+                    # just start up the iperf3 server in configuration
+                    missionResourceCommands = getMissionResourceCommands(self.missions[0])
+                    for s in slices:
+                        for node in s.get_nodes():
+                            nodeName = node.get_name()
+                            print("Run Commands for nodeName: " + nodeName)
+                            for command in missionResourceCommands:
+                                print("command: " + command)
+                                stdout, stderr = node.execute(command)
+                                print(stdout)
+                                print(stderr)
+
+                    msgFromServer['missionstatus'] = "confirmed"
                     
                 elif msgType == "resourceInfo":
                     msgFromServer['resources'] = self.resourceList 
@@ -370,7 +348,7 @@ class FlyPawBasestationAgent(object):
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "abortMission":
                     # delete the cloud resources
-                    self.cloud_mgr.delete_resources()
+                    self.cloud_mgr.delete()
                 else:
                     print("msgType: " + msgType)
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
@@ -381,8 +359,9 @@ class FlyPawBasestationAgent(object):
                     print ("cannot encode reply msg: " + pe)
                 
             except pickle.UnpicklingError as upe:
-                print ("cannot decode message from drone: " + upe)
-        
+                print("cannot decode message from drone: " + upe)
+
+
 if __name__ == '__main__':
     FPBA = FlyPawBasestationAgent()
     FPBA.basestationDispatch()
