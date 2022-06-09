@@ -1,7 +1,9 @@
 runtime:
-  slice_name: mb_slice
-  slice-private-key-location: /root/elyons/fabric_sliver_key
-  slice-public-key-location: /root/elyons/fabric_sliver_key.pub
+  slice_name: flypaw_slice
+  #slice-private-key-location: /root/elyons/fabric_sliver_key
+  #slice-public-key-location: /root/elyons/fabric_sliver_key.pub
+  slice-private-key-location: /root/kthare10/id_rsa
+  slice-public-key-location: /root/kthare10/id_rsa.pub
 
 resources:
     # To provision resources on multiple sites at FABRIC;
@@ -25,7 +27,7 @@ resources:
         type: Baremetal
         site: KVM@TACC # Possible values => KVM@TACC, CHI@TACC and CHI@UC
         count: 1 # Increase as needed
-        image: CC-CentOS8
+        image: CC-CentOS7
         network:
           type: sharednet1 # Possible values: sharednet1(when creating nodes on single site),
                            # sharedwan1 (when creating nodes on multiple CHI sites)
@@ -59,7 +61,7 @@ chameleon:
   # Chameleon user name
   user: kthare10
   # Create a CLI Password as described here: https://chameleoncloud.readthedocs.io/en/latest/technical/cli.html
-  password:
+  password: abcd1234
   auth_url:
     tacc: https://chi.tacc.chameleoncloud.org:5000/v3
     uc: https://chi.uc.chameleoncloud.org:5000/v3

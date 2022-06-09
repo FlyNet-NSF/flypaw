@@ -10,7 +10,7 @@ from mobius.controller.controller import Controller
 
 from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
 
-from cloud_resources import CloudResources
+#from cloud_resources import CloudResources
 
 #sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
 #from aerpawlib.util import Coordinate
@@ -22,19 +22,35 @@ from cloud_resources import CloudResources
 from datetime import datetime
 
 def getMissionLibraries(mission):
+    thisMission = mission.__dict__
     missionLibraries = []
-    if 'missionType' in mission:
-        missiontype = mission['missionType']
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
         if missiontype == "bandwidth":
+            #iperf
             missionLibraries.append("iperf3")
+            #ffmpeg --> maybe move to a different mission
+            missionLibraries.append("epel-release")
+            
     return missionLibraries
 
 def getMissionResourceCommands(mission):
+    thisMission = mission.__dict__
     missionResourceCommands = []
-    if 'missionType' in mission:
-        missiontype = mission['missionType']
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
         if missiontype == "bandwidth":
+            #open up the ports... maybe there is a more precise way to do this
+            missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
+            #run iperf3
             missionResourceCommands.append("iperf3 --server -J -D --logfile iperf3.txt")
+            #run ffmpeg
+            #for centos7 have to complete install before running
+            missionResourceCommands.append("sudo yum localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
+            missionResourceCommands.append("sudo yum install ffmpeg");
+            missionResourceCommands.append("mkdir /home/cc/ffmpeg");
+            missionResourceCommands.append("ffmpeg -i udp://172.16.0.1:23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 -nostdin &")
+            
     return missionResourceCommands
 
 def getPlanFromPlanfile(filepath):
@@ -276,10 +292,23 @@ class FlyPawBasestationAgent(object):
 
                     #get cloud resources and configure to mission
                     self.cloud_mgr.create()
+                    
                     slices = self.cloud_mgr.get_resources()
                     for s in slices:
-                        print(s)
+                        for n in s.get_nodes():
+                            thisResourceInfo = resourceInfo()
+                            thisResourceInfo.name = n.get_name()
+                            thisResourceInfo.location = "KVM@TACC" #extract algorithmically
+                            thisResourceInfo.purpose = "mission" #get from mission somehow
+                            
+                            m_ip = ("management", n.get_management_ip())
+                            e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
+                            thisResourceInfo.resourceAddresses.append(m_ip)
+                            thisResourceInfo.resourceAddresses.append(e_ip)
+                            thisResourceInfo.state = n.get_reservation_state()
+                            self.resourceList.append(thisResourceInfo)
 
+                    
                     # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
@@ -292,8 +321,21 @@ class FlyPawBasestationAgent(object):
                         for node in s.get_nodes():
                             nodeName = node.get_name()
                             print("Install Libraries for nodeName: " + nodeName)
+                            #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
+                            #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
+                            #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
+                            stdout, stderr = node.execute(getRepoStr)
+                            print(stdout)
+                            print(stderr)
+                            stdout, stderr = node.execute(installRepoStr)
+                            print(stdout)
+                            print(stderr)
+                            stdout, stderr = node.execute(swapRepoStr)
+                            print(stdout)
+                            print(stderr)
                             for library in missionLibraries:
-                                libraryInstallStr = "sudo yum -y install " + library
+                                #libraryInstallStr = "sudo dnf -y install " + library #centos8 
+                                libraryInstallStr = "sudo yum -y install " + library #centos7
                                 print(nodeName + ": " + libraryInstallStr)
                                 stdout, stderr = node.execute(libraryInstallStr)
                                 print(stdout)
