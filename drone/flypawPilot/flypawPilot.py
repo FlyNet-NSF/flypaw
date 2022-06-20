@@ -257,6 +257,11 @@ class FlyPawPilot(StateMachine):
             else:
                 print("no external IP address found for node: " + resource.name)
 
+        """
+        Mission Specific Update Now that we have resource IP addresses
+        """
+        self.videoURL = "udp://" + externalIP + ":23000"
+
         
         #configureResources should block up to 5 minutes while configuring 
         #configureResources(missionLibraries, self.resources[0])
