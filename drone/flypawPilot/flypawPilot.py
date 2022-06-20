@@ -9,6 +9,7 @@ import socket
 import pickle
 import uuid
 import select
+import ffmpeg
 #import pika                                                                                                                                                               
 import threading
 import random
@@ -28,18 +29,6 @@ sys.path.append('/root/elyons/flypaw/basestation/basestationAgent')
 from flypawClasses import resourceInfo, missionInfo, Position, Battery
 #import flypawClasses
 
-"""
-class resourceInfo(object):
-    def __init__(self):
-        self.name = str #identifier for resource
-        self.location = str #edge, cloud x, cloud y
-        self.purpose = str #mission related I guess
-        self.interface = str #thinking something like direct vs kubectl
-        self.resourceAddresses = [] #one or more ways to communicate with resource... possibly a pairing? (ipv4, "xxx.xxx.xxx.xxx")
-        self.state = str #resource reservation state
-        self.load = float #placeholder for now... maybe if we have info from prometheus or something
-"""
-
 class FlyPawPilot(StateMachine):
     def __init__(self):
         self.currentPosition = Position()
@@ -56,9 +45,12 @@ class FlyPawPilot(StateMachine):
         self.currentWaypointIndex = 0
         self.nextStates = []
         self.logfiles = {}
+        self.videoLocation = "/root/video/video_diff_resolution/example1/video_1280_720.mpg"
         #hardcode this for now
-        self.basestationIP = "172.16.0.1"
         
+        self.basestationIP = "172.16.0.1"
+        self.videoURL = "udp://" + self.basestationIP + ":23000"
+        self.frame = 0
         
         now = datetime.now()
         current_timestring = now.strftime("%Y%m%d-%H%M%S")
@@ -229,7 +221,7 @@ class FlyPawPilot(StateMachine):
         #likely a lot more to check... 
 
         #ok, try to accept mission
-        print("accepting mission... this can take up to 5 minutes to get confirmation while cloud resources are reserved")
+        print("accepting mission... this can take up to 10 minutes to get confirmation while cloud resources are reserved")
         missionAccepted = acceptMission(self.basestationIP, self.missions[0])
         if missionAccepted:
             print (self.missions[0].missionType + " mission accepted")
@@ -258,7 +250,7 @@ class FlyPawPilot(StateMachine):
             externalIP = None
             for address in resource.resourceAddresses:
                 print("address type: " + address[0])
-                if (address[0] == "Management IP"):
+                if (address[0] == "external"):
                     externalIP = address[1]
             if externalIP is not None:
                 print("external IP: " + str(externalIP))
@@ -519,71 +511,87 @@ class FlyPawPilot(StateMachine):
             externalIP = None
             for address in resource.resourceAddresses:
                 print("address type: " + address[0])
-                if (address[0] == "Management IP"):
+                if (address[0] == "external"):
                     externalIP = address[1]
-                    if externalIP is not None:
-                        x = uuid.uuid4()
-                        msg = {}
-                        msg['uuid'] = str(x)
-                        msg['type'] = "iperfResults"
-                        msg['iperfResults'] = {}
-                        client = iperf3.Client()
-                        client.server_hostname = str(externalIP)
-                        #client.server_hostname = self.basestationIP
-                        client.port = 5201
-                        client.duration = 3
-                        client.json_output = True
-                        result = client.run()
-                        err = result.error
-                        iperfPosition = getCurrentPosition(drone)
-                        msg['iperfResults']['ipaddr'] = client.server_hostname
-                        msg['iperfResults']['port'] = client.port
-                        msg['iperfResults']['protocol'] = "tcp" #static for now
-                        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
-                        if err is not None:
-                            msg['iperfResults']['connection'] = err
-                            msg['iperfResults']['mbps'] = None
-                            msg['iperfResults']['retransmits'] = None
-                            msg['iperfResults']['meanrtt'] = None
-                            thistime = datetime.now()
-                            unixsecs = datetime.timestamp(thistime)
-                            msg['iperfResults']['unixsecs'] = int(unixsecs)
+            if externalIP is not None:
+                x = uuid.uuid4()
+                msg = {}
+                msg['uuid'] = str(x)
+                msg['type'] = "iperfResults"
+                msg['iperfResults'] = {}
+                client = iperf3.Client()
+                client.server_hostname = str(externalIP)
+                #client.server_hostname = self.basestationIP
+                client.port = 5201
+                client.duration = 3
+                client.json_output = True
+                result = client.run()
+                err = result.error
+                iperfPosition = getCurrentPosition(drone)
+                msg['iperfResults']['ipaddr'] = client.server_hostname
+                msg['iperfResults']['port'] = client.port
+                msg['iperfResults']['protocol'] = "tcp" #static for now
+                msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+                if err is not None:
+                    msg['iperfResults']['connection'] = err
+                    msg['iperfResults']['mbps'] = None
+                    msg['iperfResults']['retransmits'] = None
+                    msg['iperfResults']['meanrtt'] = None
+                    thistime = datetime.now()
+                    unixsecs = datetime.timestamp(thistime)
+                    msg['iperfResults']['unixsecs'] = int(unixsecs)
+                else:
+                    datarate = result.sent_Mbps
+                    retransmits = result.retransmits
+                    unixsecs = result.timesecs
+                    result_json = result.json
+                    meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
+                    msg['iperfResults']['connection'] = 'ok'
+                    msg['iperfResults']['mbps'] = datarate
+                    msg['iperfResults']['retransmits'] = retransmits
+                    msg['iperfResults']['unixsecs'] = unixsecs
+                    msg['iperfResults']['meanrtt'] = meanrtt
+                    
+                    result_str = json.dumps(msg)
+                    with open(self.logfiles['iperf'], "a") as ofile:
+                        ofile.write(result_str + "\n")
+                        ofile.close()
+                    iperfObjArr.append(msg['iperfResults'])
+                    serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
+                    if serverReply is not None:
+                        print(serverReply['uuid_received'])
+                        if serverReply['uuid_received'] == str(x):
+                            print(serverReply['type_received'] + " receipt confirmed by UUID")
+                            self.communications['iperf'] = 1
                         else:
-                            datarate = result.sent_Mbps
-                            retransmits = result.retransmits
-                            unixsecs = result.timesecs
-                            result_json = result.json
-                            meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
-                            msg['iperfResults']['connection'] = 'ok'
-                            msg['iperfResults']['mbps'] = datarate
-                            msg['iperfResults']['retransmits'] = retransmits
-                            msg['iperfResults']['unixsecs'] = unixsecs
-                            msg['iperfResults']['meanrtt'] = meanrtt
-
-                        result_str = json.dumps(msg)
-                        with open(self.logfiles['iperf'], "a") as ofile:
-                            ofile.write(result_str + "\n")
-                            ofile.close()
-                        iperfObjArr.append(msg['iperfResults'])
-                        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
-                        if serverReply is not None:
-                            print(serverReply['uuid_received'])
-                            if serverReply['uuid_received'] == str(x):
-                                print(serverReply['type_received'] + " receipt confirmed by UUID")
-                                self.communications['iperf'] = 1
-                            else:
-                                print(serverReply['type_received'] + " does not match our message UUID")
-                                self.communications['iperf'] = 0
-                        else:
-                            print("no reply from server while transmitting iperfResults")
+                            print(serverReply['type_received'] + " does not match our message UUID")
                             self.communications['iperf'] = 0
+                    else:
+                        print("no reply from server while transmitting iperfResults")
+                        self.communications['iperf'] = 0
         #at the end append all the individual iperf results to the self array
         self.currentIperfObjArr.append(iperfObjArr)
         return "nextAction"
 
     @state(name="sendVideo")
     async def sendVideo(self, _ ):
+        print("sendVideo")
         logState(self.logfiles['state'], "sendVideo")
+        stream = ffmpeg.input(self.videoLocation)
+        endframe = self.frame + 100
+        if endframe > 1400:
+            self.frame = 0
+            endframe = 100
+        ffmpeg_out = (
+            ffmpeg
+            .concat(stream.trim(start_frame=self.frame, end_frame=endframe))
+            .output(self.videoURL, vcodec='mpeg4', f='mpegts')
+            .global_args('-report')
+            .run_async(pipe_stdout=True)
+        )
+        ffmpeg_out.wait()
+        self.frame = endframe
+        
         x = uuid.uuid4()
         msg = {}
         msg['uuid'] = str(x)
@@ -964,8 +972,8 @@ def acceptMission(basestationIP, thismission):
     msg = {}
     msg['uuid'] = str(x)
     msg['type'] = "acceptMission"
-    #wait up to 5 minutes for cloud resources to be procured after accepting mission
-    serverReply = udpClientMsg(msg, basestationIP, 20001, 300)
+    #wait up to 10 minutes for cloud resources to be procured after accepting mission
+    serverReply = udpClientMsg(msg, basestationIP, 20001, 600)
     if serverReply is not None:
         print(serverReply['uuid_received'])
         if serverReply['uuid_received'] == str(x):
@@ -985,6 +993,7 @@ def getEntryMissionActions(missiontype):
     mission_actions = []
     if missiontype == "bandwidth":
         mission_actions.append('iperf')
+        mission_actions.append('sendVideo')
     return mission_actions
 
 def logState(logfile, state):
