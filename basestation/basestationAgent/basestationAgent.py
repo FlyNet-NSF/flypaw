@@ -1,13 +1,57 @@
+#!/usr/bin/env python3
 import socket
 import pickle
 import json
+import geojson as gj
 import sys
+import pytz
+import requests
+from mobius.controller.controller import Controller
+
+from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
+
+#from cloud_resources import CloudResources
+
+#sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
+#from aerpawlib.util import Coordinate
 #from aerpawlib.vehicle import Drone
 #from aerpawlib.vehicle import Vehicle
 #import dronekit
 
 #import aerpawlib
 from datetime import datetime
+
+def getMissionLibraries(mission):
+    thisMission = mission.__dict__
+    missionLibraries = []
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
+        if missiontype == "bandwidth":
+            #iperf
+            missionLibraries.append("iperf3")
+            #ffmpeg --> maybe move to a different mission
+            missionLibraries.append("epel-release")
+            
+    return missionLibraries
+
+def getMissionResourceCommands(mission):
+    thisMission = mission.__dict__
+    missionResourceCommands = []
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
+        if missiontype == "bandwidth":
+            #open up the ports... maybe there is a more precise way to do this
+            missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
+            #run iperf3
+            missionResourceCommands.append("iperf3 --server -J -D --logfile iperf3.txt")
+            #run ffmpeg
+            #for centos7 have to complete install before running
+            missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
+            missionResourceCommands.append("sudo yum -y install ffmpeg");
+            missionResourceCommands.append("mkdir /home/cc/ffmpeg");
+            missionResourceCommands.append("ffmpeg -i udp://172.16.0.1:23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 -nostdin &")
+            
+    return missionResourceCommands
 
 def getPlanFromPlanfile(filepath):
     f = open(filepath)
@@ -57,91 +101,32 @@ def processPlan(plan):
     processedPlan['default_waypoints'] = default_waypoints
     return processedPlan
 
-class IperfInfo(object):
-    def __init__(self, ipaddr="172.16.0.1", port=5201, protocol="tcp", priority=0, mbps=0, meanrtt=0):
-        self.ipaddr = ipaddr #string server ip address
-        self.port = port #string server port address 
-        self.protocol = protocol #tcp, udp
-        self.priority = 1 #normalized float 0-1         
-        self.mbps = mbps #float, units mbps, representing throughput
-        self.meanrtt = meanrtt #float, units ms, representing latency
-        self.location4d = [float, float, float, str]
-        
-class collectVideoInfo(object):
-    def __init__(self, dataformat="jpgframes", duration=5, quality=100, priority = 1):
-        self.dataformat = dataformat #jpgframes, ffmpeg, etc
-        self.duration = duration #units seconds
-        self.quality = quality #arbitrary unit
-        self.priority = priority #normalized float 0-1
-
-class sendVideoInfo(object):
-    def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="23000", priority=1):
-        self.dataformat = dataformat #jpgframes, ffmpeg, etc
-        self.ipaddr = ipaddr #string ip address
-        self.port = port #int port number 
-        self.priority = priority #normalized float 0-1
-
-class flightInfo(object):
-    def __init__(self):
-        """
-        coords : [float,float]--> [lon, lat]
-        altitude: float --> M AGL(?)
-        airspeed: float --> 
-        """
-        self.coords = [] #[lon, lat]
-        self.altitude = float #meters 
-        self.airspeed = float #airspeed 
-        self.groundspeed = float #groundspeed
-        self.priority = float #normalized float 0-1
-
-class missionInfo(object):
-    #we'll have to think this through for different mission types
-    def __init__(self):
-        self.defaultWaypoints = [] #planfile
-        self.missionType = str #videography, delivery, air taxi, etc.
-        self.missionLeader = str #basestation, drone, cloud, edge device(s)
-        self.priority = float #normalized float from 0-1
-        self.planfile = str #path to planfile optional 
-        
-class VehicleCommands(object):
-    def __init__(self):
-        self.commands = {}
-        self.commands['iperf'] = {} 
-        self.commands['sendVideo'] = {} 
-        self.commands['collectVideo'] = {}
-        self.commands['flight'] = {}
-        
-    def setIperfCommand(self, iperfObj):
-        self.commands['iperf'] = { "command" : "iperf", "protocol": iperfObj.protocol, "ipaddr": iperfObj.ipaddr, "port": iperfObj.port, "priority": iperfObj.priority } 
-    def setCollectVideoCommand(self, collectVideoObj):
-        self.commands['collectVideo'] = { "command" : "collectVideo", "dataformat" : collectVideoObj.dataformat, "duration": collectVideoObj.duration, "quality": collectVideoObj.quality, "priority": collectVideoObj.priority }
-    def setSendVideoCommand(self, sendVideoObj):
-        self.commands['sendVideo'] = { "command" : "sendVideo", "dataformat" : sendVideoObj.dataformat, "ipaddr": sendVideoObj.ipaddr, "port": sendVideoObj.port, "priority": sendVideoObj.priority  }
-    def setFlightCommand(self, flightObj):
-        self.commands['flight'] = { "command" : "flight", "destination" : flightObj.destination, "speed": flightObj.speed, "priority": flightObj.priority }
-    def setMissionCommand(self, missionObj):
-        self.commands['mission'] = { "command": "mission", "defaultWaypoints": missionObj.defaultWaypoints, "missionType": missionObj.missionType, "missionControl": missionObj.missionControl, "priority": missionObj.priority }
-        
-
 class FlyPawBasestationAgent(object):
     def __init__(self, ipaddr="172.16.0.1", port=20001, chunkSize=1024) :
         self.ipaddr = ipaddr
         self.port = port
         self.chunkSize = chunkSize
-        self.iperf3Agent = IperfInfo()
+        self.iperf3Agent = iperfInfo()
         self.videoTransferAgent = sendVideoInfo()
         self.videoCollectionAgent = collectVideoInfo()
         self.flightInfo = flightInfo()
         self.missions = []
         self.currentRequests = []
         self.iperfHistory = []
+        self.resourceList = []
         #self.drone = Drone() #our digital twin
+        self.droneSim = droneSim()
         self.vehicleCommands = VehicleCommands()
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
         self.vehicleCommands.setCollectVideoCommand(self.videoCollectionAgent)
         self.vehicleCommands.setSendVideoCommand(self.videoTransferAgent)
+        self.acs = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightPath"
+        self.usrname = "admin"
+        self.password = "shabiz"
+        self.updateURL = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightUpdate"
         #for mission data, we should probably be checking elsewhere... for now we'll just define a mission here:
         mission = missionInfo()
+        mission.name = "AERPAW"
         mission.missionType = "bandwidth" #"videography"
         mission.missionLeader = "drone" #or basestation or cloud
         mission.priority = 1
@@ -150,44 +135,95 @@ class FlyPawBasestationAgent(object):
         plan = getPlanFromPlanfile(mission.planfile)
         processedPlan = processPlan(plan)
         mission.default_waypoints = processedPlan['default_waypoints']
-        self.missions.append({'missionType': mission.missionType, 'missionLeader': mission.missionLeader, 'default_waypoints': mission.default_waypoints, 'priority': mission.priority})
+        self.missions.append(mission)
+        self.cloud_mgr = Controller(config_file_location="./config.yml")
 
-    def update_digital_twin(self, msg):
+    def update_digital_twin(self):
         """
         function call to update the digital twin with different types of incoming data   
         """
+        return
+    
+    def handle_telemetry(self, msg):
+        """
+        do things like send to digital twin and ACS
+        """
         if msg['type'] == "telemetry":
-            print("update twin with telemetry")
+            print("update self coordinates")
             if msg['telemetry']['position'] is not None:
-                self.drone.position.lat = msg['telemetry']['position'][0]
-                self.drone.position.lon = msg['telemetry']['position'][1]
-                self.drone.position.alt = msg['telemetry']['position'][2]
-                self.drone.position.time = msg['telemetry']['position'][3]
-            if msg['telemetry']['gps'] is not None:
-                self.drone.gps.fix_type = msg['telemetry']['gps']['fix_type']
-                self.drone.gps.satellites_visible = msg['telemetry']['gps']['satellites_visible']
+                self.droneSim.position = msg['telemetry']['position']
             if msg['telemetry']['battery'] is not None:
-                self.drone.battery.voltage = msg['telemetry']['battery']['voltage']
-                self.drone.battery.current = msg['telemetry']['battery']['current']
-                self.drone.battery.level = msg['telemetry']['battery']['level']
+                self.droneSim.battery = msg['telemetry']['battery']
             #if msg['telemetry']['attitude'] is not None:
             #self.drone.attitude.pitch = msg['telemetry']['attitude']['pitch']
             #self.drone.attitude.yaw = msg['telemetry']['attitude']['yaw']
             #self.drone.attitude.roll = msg['telemetry']['attitude']['roll']
             if msg['telemetry']['heading'] is not None:
-                self.drone.heading = msg['telemetry']['heading']
+                self.droneSim.heading = msg['telemetry']['heading']
             if msg['telemetry']['home'] is not None:
-                self.drone.home_coords.lat = msg['telemetry']['home'][0]
-                self.drone.home_coords.lon = msg['telemetry']['home'][1]
-                self.drone.home_coords.alt = msg['telemetry']['home'][2]
-        return
-    
-    def handle_telemetry(self, msg):
-        """                                                                                                                                                                                  function to apply to received telemetry message (tm in function call) from drone                                                                                                     update digital twin                                                                                                                                                                  update registration system                                                                                                                                                           """
+                self.droneSim.home = msg['telemetry']['home']
+            if msg['telemetry']['nextWaypoint'] is not None:
+                self.droneSim.nextWaypoint = msg['telemetry']['nextWaypoint']
+            
         #self.update_digital_twin(msg)
-	#update_acs                                                                                                                                                                          #maybe send digital twin somewhere in the cloud for sim
+        acsUpdate = self.update_acs()
+        print(acsUpdate)
         return
-    
+
+    def update_acs(self):
+        postData = {}
+        postData['type'] = 'Feature'
+        
+        geometry = {}
+        geometry['type'] = 'Point'
+
+        currentLocation = []
+        currentLocation.append(self.droneSim.position.lon)
+        currentLocation.append(self.droneSim.position.lat)
+        currentLocation.append(self.droneSim.position.alt)
+
+        geometry['coordinates'] = currentLocation
+        #geometry['coordinates'] = self.droneSim.position
+        postData['geometry'] = geometry
+        
+        properties = {}
+        #just use the first mission name for now
+        properties['eventName'] = self.missions[0].name
+        properties['locationTimestamp'] = self.droneSim.position.time
+        
+        nextWP = {}
+        nextWPGeo = {}
+        nextWPGeo['type'] = 'Point'
+        #nextWaypoint = []
+        #nextWaypoint.append(self.droneSim.nextWaypoint.lon)
+	#nextWaypoint.append(self.droneSim.nextWaypoint.lat)
+	#nextWaypoint.append(self.droneSim.nextWaypoint.alt)
+        #nextWPGeo['coordinates'] = nextWaypoint
+        nextWPGeo['coordinates'] = []
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[0])
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[1])
+        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[2])
+        
+        nextWP['geometry'] = nextWPGeo
+        nextWP['type'] = 'Feature'
+        properties['nextWaypoint'] = nextWP        
+        properties['userProperties'] = {}
+        properties['userProperties']['heading'] = self.droneSim.heading
+        postData['properties'] = properties
+        post_json_data = json.dumps(postData)
+
+        postParameters = {}
+        postParameters['json'] = post_json_data
+        flightupdateresp = requests.post(self.updateURL, auth=(self.usrname, self.password), data=postParameters)
+        updateResp = {}
+        updateResp['registrationStatusCode'] = flightupdateresp.status_code
+        #print(flightsubmitresp.status_code)
+        if flightupdateresp.status_code == 200:
+            updateResp['registration'] = "OK"
+        else:
+            updateResp['registration'] = "FAILED"
+        return updateResp['registration']
+            
     def basestationDispatch(self):
         UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         UDPServerSocket.bind((self.ipaddr, self.port))
@@ -218,12 +254,111 @@ class FlyPawBasestationAgent(object):
                     msgFromServer['missions'] = self.missions
                     
                 elif msgType == "acceptMission":
-                    #get final approval of DCB
-                    #do any preflight resource reservation with Mobius, etc
-                    #register flight in ACS or wherever
-                    #if all good
-                    msgFromServer['missionstatus'] = "confirmed"
 
+                    #register in ACS  (once it's working move it down below the get resources
+                    
+                    """
+                    ACS registration
+                    """
+                    print("register in ACS")
+                    
+                    lineString = gj.LineString(self.missions[0].default_waypoints)
+                    userProperties = {}
+                    featureList = []
+                    userProperties['classification'] = "scheduledFlight";
+                    eventName = self.missions[0].name
+                    #utcnow = datetime.utcnow()
+                    #startTime = utcnow.isoformat(sep='T')
+                    currentUnixsecs = datetime.now(tz=pytz.UTC).timestamp()
+                    laterUnixsecs = currentUnixsecs + 1800 #half an hour from now
+                    currentDT = datetime.fromtimestamp(currentUnixsecs, tz=pytz.UTC)
+                    laterDT = datetime.fromtimestamp(laterUnixsecs, tz=pytz.UTC)
+                    startTime = currentDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+                    endTime = laterDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+
+                    feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
+                    featureList.append(feature)
+                    fc = gj.FeatureCollection(featureList)
+                    dumpFC = gj.dumps(fc, sort_keys=True)
+                    FC_data = {'json': dumpFC}
+                    flightsubmitresp = requests.post(self.acs, auth=(self.usrname, self.password), data=FC_data)
+                    registerResp = {}
+                    registerResp['registrationStatusCode'] = flightsubmitresp.status_code
+                    print(flightsubmitresp.status_code)
+                    if flightsubmitresp.status_code == 200:
+                        registerResp['registration'] = "OK"
+                    else:
+                        registerResp['registration'] = "FAILED"
+
+                    #get cloud resources and configure to mission
+                    self.cloud_mgr.create()
+                    
+                    slices = self.cloud_mgr.get_resources()
+                    for s in slices:
+                        for n in s.get_nodes():
+                            thisResourceInfo = resourceInfo()
+                            thisResourceInfo.name = n.get_name()
+                            thisResourceInfo.location = "KVM@TACC" #extract algorithmically
+                            thisResourceInfo.purpose = "mission" #get from mission somehow
+                            
+                            m_ip = ("management", n.get_management_ip())
+                            e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
+                            thisResourceInfo.resourceAddresses.append(m_ip)
+                            thisResourceInfo.resourceAddresses.append(e_ip)
+                            thisResourceInfo.state = n.get_reservation_state()
+                            self.resourceList.append(thisResourceInfo)
+
+                    
+                    # configure nodes
+                    """
+                    Mission Library Installation on Cloud Nodes
+                    """
+                    # need a mapping function of mission libraries to nodes... maybe for multiple missions also
+                    # for now just use the first mission and install all libraries on all nodes
+                    missionLibraries = getMissionLibraries(self.missions[0])
+
+                    for s in slices:
+                        for node in s.get_nodes():
+                            nodeName = node.get_name()
+                            print("Install Libraries for nodeName: " + nodeName)
+                            #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
+                            #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
+                            #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
+                            #stdout, stderr = node.execute(getRepoStr)
+                            #print(stdout)
+                            #print(stderr)
+                            #stdout, stderr = node.execute(installRepoStr)
+                            #print(stdout)
+                            #print(stderr)
+                            #stdout, stderr = node.execute(swapRepoStr)
+                            #print(stdout)
+                            #print(stderr)
+                            for library in missionLibraries:
+                                #libraryInstallStr = "sudo dnf -y install " + library #centos8 
+                                libraryInstallStr = "sudo yum -y install " + library #centos7
+                                print(nodeName + ": " + libraryInstallStr)
+                                stdout, stderr = node.execute(libraryInstallStr)
+                                print(stdout)
+                                print(stderr)
+
+                    # ideally this would be coordinated be done through KubeCtl or something, but initially we'll 
+                    # just start up the iperf3 server in configuration
+                    missionResourceCommands = getMissionResourceCommands(self.missions[0])
+                    for s in slices:
+                        for node in s.get_nodes():
+                            nodeName = node.get_name()
+                            print("Run Commands for nodeName: " + nodeName)
+                            for command in missionResourceCommands:
+                                print("command: " + command)
+                                stdout, stderr = node.execute(command)
+                                print(stdout)
+                                print(stderr)
+
+                    msgFromServer['missionstatus'] = "confirmed"
+                    
+                elif msgType == "resourceInfo":
+                    msgFromServer['resources'] = self.resourceList 
+                    
                 elif msgType == "telemetry":
                     #update your digital twin, update registry, pass on to downstream applications
                     self.handle_telemetry(clientMessage)
@@ -253,6 +388,9 @@ class FlyPawBasestationAgent(object):
                         self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "sendVideo":
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "abortMission":
+                    # delete the cloud resources
+                    self.cloud_mgr.delete()
                 else:
                     print("msgType: " + msgType)
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
@@ -263,8 +401,9 @@ class FlyPawBasestationAgent(object):
                     print ("cannot encode reply msg: " + pe)
                 
             except pickle.UnpicklingError as upe:
-                print ("cannot decode message from drone: " + upe)
-        
+                print("cannot decode message from drone: " + upe)
+
+
 if __name__ == '__main__':
     FPBA = FlyPawBasestationAgent()
     FPBA.basestationDispatch()

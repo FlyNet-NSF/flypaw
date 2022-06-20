@@ -1,0 +1,95 @@
+runtime:
+  slice_name: researcher_slice
+  #slice-private-key-location: /root/.ssh/fabric_key
+  #slice-public-key-location: /root/.ssh/fabric_key.pub
+  slice-private-key-location: /root/.ssh/chameleon_key
+  slice-public-key-location: /root/.ssh/chameleon_key.pub
+
+resources:
+    # To provision resources on multiple sites at FABRIC;
+    # just copy and add additional resource block for different site
+    - resource:
+        type: VM
+        site: FABRIC.RANDOM # change to specific SITE if needed
+        count: 0 # Increase as needed
+        image: default_rocky_8
+        nic_model: NIC_Basic # NIC_Basic(SRIOV), NIC_ConnectX_5 => 25GB, NIC_ConnectX_6 => 100GB
+        name_prefix: node
+        network:
+          type: IPv6 # Allowed values IPv4 or IPv6
+        flavor:
+          cores: 2
+          ram: 8
+          disk: 10
+    # To provision resources on multiple sites at Chameleon;
+    # just copy and add additional resource block for different site
+    - resource:
+        type: Baremetal
+        site: KVM@TACC # Possible values => KVM@TACC, CHI@TACC and CHI@UC
+        count: 1 # Increase as needed
+        image: CC-CentOS7
+        network:
+          type: sharednet1 # Possible values: sharednet1(when creating nodes on single site),
+                           # sharedwan1 (when creating nodes on multiple CHI sites)
+        name_prefix: node
+        flavor:
+          name: m1.large
+                           # Possible values (e.g. compute_cascadelake, compute_cascadelake_r, compute_skylake, ) for CHI@UC and CHI@TACC.
+                           # More details for CHI@UC and CHI@TACC here https://www.chameleoncloud.org/hardware/
+                           # Possible values (e.g: m1.tiny => CPU(1), RAM(512MB) Disk(1GB), m1.small => CPU(1), RAM(2GB) Disk(20GB),
+                           # m1.medium => CPU(2), RAM(4GB) Disk(40GB), m1.large => CPU(4), RAM(8GB) Disk(40GB),
+                           # m1.xlarge => CPU(8), RAM(16GB) Disk(40GB)) for KVM@TACC.
+                           # More details for KVM@TACC here: https://chameleoncloud.readthedocs.io/en/latest/technical/kvm.html#launching-instances
+
+fabric:
+  oc-host: orchestrator.fabric-testbed.net
+  cm-host: cm.fabric-testbed.net
+  # Tokens are user specific are must be downloaded before provisioning resources on FABRIC from https://portal.fabric-testbed.net/ via Experiments -> Manage Tokens
+  token-location: /root/.ssh/tokens.json
+
+  bastion-host: bastion-1.fabric-testbed.net
+  # User must create a Bastion Key and User before provisioning resources on FABRIC from https://portal.fabric-testbed.net/ via Experiments -> Manage SSH Keys
+  bastion-user-name: researcher_0123456789
+
+  # Path to the Bastion private key created from https://portal.fabric-testbed.net/ via Experiments -> Manage SSH Keys
+  bastion-key-location: /root/.ssh/bastion_key
+
+  # FABRIC Project Id can be found from https://portal.fabric-testbed.net/ via Projects tab
+  project_id: <project_uuid>
+
+chameleon:
+  # Chameleon user name
+  user: researcher
+  # Create a CLI Password as described here: https://chameleoncloud.readthedocs.io/en/latest/technical/cli.html
+  password: examplePass
+  auth_url:
+    tacc: https://chi.tacc.chameleoncloud.org:5000/v3
+    uc: https://chi.uc.chameleoncloud.org:5000/v3
+    kvm: https://kvm.tacc.chameleoncloud.org:5000/v3
+    edge: https://chi.edge.chameleoncloud.org:5000/v3
+  client_id:
+    tacc: keystone-tacc-prod
+    uc: keystone-uc-prod
+    kvm: keystone-kvm-prod
+    edge: keystone-edge-prod
+  key_pair: chameleon_key
+
+  # Specify the Project Name can be found https://www.chameleoncloud.org/
+  project_name: <your_chameleon_project>
+
+  # Specify the Project Id for each region can be found by going to https://www.chameleoncloud.org/
+  # Then Click Experiment and select the specific site
+  # Go to Identity -> Projects and grab the project id
+
+  project_id:
+    tacc: <tacc_project_id>
+    uc: <uc_project_id>
+    kvm: <kvm_project_id>
+    edge: <edge_project_id>
+
+logging:
+  log-file: ./mobius.log
+  log-level: INFO
+  log-retain: 5
+  log-size: 5000000
+  logger: mobius
