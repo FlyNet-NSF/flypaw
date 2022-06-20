@@ -6,6 +6,7 @@ import geojson as gj
 import sys
 import pytz
 import requests
+import time
 from mobius.controller.controller import Controller
 
 from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
@@ -292,7 +293,7 @@ class FlyPawBasestationAgent(object):
 
                     #get cloud resources and configure to mission
                     self.cloud_mgr.create()
-                    
+                    time.sleep(3)
                     slices = self.cloud_mgr.get_resources()
                     for s in slices:
                         for n in s.get_nodes():
@@ -307,8 +308,8 @@ class FlyPawBasestationAgent(object):
                             thisResourceInfo.resourceAddresses.append(e_ip)
                             thisResourceInfo.state = n.get_reservation_state()
                             self.resourceList.append(thisResourceInfo)
-
-                    
+                    print("giving resources 10 seconds to come online")
+                    time.sleep(10)
                     # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
