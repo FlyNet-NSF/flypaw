@@ -6,6 +6,7 @@ import geojson as gj
 import sys
 import pytz
 import requests
+import time
 from mobius.controller.controller import Controller
 
 from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
@@ -46,8 +47,8 @@ def getMissionResourceCommands(mission):
             missionResourceCommands.append("iperf3 --server -J -D --logfile iperf3.txt")
             #run ffmpeg
             #for centos7 have to complete install before running
-            missionResourceCommands.append("sudo yum localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
-            missionResourceCommands.append("sudo yum install ffmpeg");
+            missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
+            missionResourceCommands.append("sudo yum -y install ffmpeg");
             missionResourceCommands.append("mkdir /home/cc/ffmpeg");
             missionResourceCommands.append("ffmpeg -i udp://172.16.0.1:23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 -nostdin &")
             
@@ -292,7 +293,7 @@ class FlyPawBasestationAgent(object):
 
                     #get cloud resources and configure to mission
                     self.cloud_mgr.create()
-                    
+                    time.sleep(3)
                     slices = self.cloud_mgr.get_resources()
                     for s in slices:
                         for n in s.get_nodes():
@@ -307,8 +308,8 @@ class FlyPawBasestationAgent(object):
                             thisResourceInfo.resourceAddresses.append(e_ip)
                             thisResourceInfo.state = n.get_reservation_state()
                             self.resourceList.append(thisResourceInfo)
-
-                    
+                    print("giving resources 10 seconds to come online")
+                    time.sleep(10)
                     # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
@@ -324,15 +325,15 @@ class FlyPawBasestationAgent(object):
                             #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
                             #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
                             #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
-                            stdout, stderr = node.execute(getRepoStr)
-                            print(stdout)
-                            print(stderr)
-                            stdout, stderr = node.execute(installRepoStr)
-                            print(stdout)
-                            print(stderr)
-                            stdout, stderr = node.execute(swapRepoStr)
-                            print(stdout)
-                            print(stderr)
+                            #stdout, stderr = node.execute(getRepoStr)
+                            #print(stdout)
+                            #print(stderr)
+                            #stdout, stderr = node.execute(installRepoStr)
+                            #print(stdout)
+                            #print(stderr)
+                            #stdout, stderr = node.execute(swapRepoStr)
+                            #print(stdout)
+                            #print(stderr)
                             for library in missionLibraries:
                                 #libraryInstallStr = "sudo dnf -y install " + library #centos8 
                                 libraryInstallStr = "sudo yum -y install " + library #centos7
