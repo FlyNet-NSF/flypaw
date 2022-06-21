@@ -35,22 +35,30 @@ def getMissionLibraries(mission):
             
     return missionLibraries
 
-def getMissionResourceCommands(mission):
+def getMissionResourceCommands(mission, resources):
     thisMission = mission.__dict__
-    missionResourceCommands = []
     if 'missionType' in thisMission:
         missiontype = thisMission['missionType']
         if missiontype == "bandwidth":
+            #for this mission we'll assume only one other computer
+            thisResourceInfo = resources[0].__dict__
+            resourceAddresses =	thisResourceInfo['resourceAddresses']
+            #generally address 0 is management IP, address 1 external IP...they could be the same
+            #resourceAddress is a pair eg. ['external', 'xxx.xxx.xxx.xxx']
+            #could cycle through each address and look for external as first part of pair rather than just assume
+            externalIP = resourceAddresses[1][1]
+            missionResourceCommands = []
             #open up the ports... maybe there is a more precise way to do this
             missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
             #run iperf3
-            missionResourceCommands.append("iperf3 --server -J -D --logfile iperf3.txt")
+            missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
             #run ffmpeg
             #for centos7 have to complete install before running
             missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
             missionResourceCommands.append("sudo yum -y install ffmpeg");
             missionResourceCommands.append("mkdir /home/cc/ffmpeg");
-            missionResourceCommands.append("ffmpeg -i udp://172.16.0.1:23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 -nostdin &")
+            ffmpeg_cmd = "ffmpeg -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 &"
+            missionResourceCommands.append(ffmpeg_cmd)
             
     return missionResourceCommands
 
@@ -308,8 +316,8 @@ class FlyPawBasestationAgent(object):
                             thisResourceInfo.resourceAddresses.append(e_ip)
                             thisResourceInfo.state = n.get_reservation_state()
                             self.resourceList.append(thisResourceInfo)
-                    print("giving resources 10 seconds to come online")
-                    time.sleep(10)
+                    print("giving resources 60 seconds to come online")
+                    time.sleep(60)
                     # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
@@ -344,7 +352,7 @@ class FlyPawBasestationAgent(object):
 
                     # ideally this would be coordinated be done through KubeCtl or something, but initially we'll 
                     # just start up the iperf3 server in configuration
-                    missionResourceCommands = getMissionResourceCommands(self.missions[0])
+                    missionResourceCommands = getMissionResourceCommands(self.missions[0],self.resourceList)
                     for s in slices:
                         for node in s.get_nodes():
                             nodeName = node.get_name()
