@@ -998,6 +998,8 @@ def getEntryMissionActions(missiontype):
     mission_actions = []
     if missiontype == "bandwidth":
         mission_actions.append('iperf')
+    elif missiontype == "videography":
+        mission_actions.append('iperf')
         mission_actions.append('sendVideo')
     return mission_actions
 
