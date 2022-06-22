@@ -32,7 +32,10 @@ def getMissionLibraries(mission):
             missionLibraries.append("iperf3")
             #ffmpeg --> maybe move to a different mission
             missionLibraries.append("epel-release")
-            
+        elif missiontype == "videography":
+            missionLibraries.append("iperf3")
+            missionLibraries.append("epel-release")
+            missionLibraries.append("docker")
     return missionLibraries
 
 def getMissionResourceCommands(mission, resources):
@@ -52,14 +55,37 @@ def getMissionResourceCommands(mission, resources):
             missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
             #run iperf3
             missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
-            #run ffmpeg
-            #for centos7 have to complete install before running
-            missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
-            missionResourceCommands.append("sudo yum -y install ffmpeg");
-            missionResourceCommands.append("mkdir /home/cc/ffmpeg");
-            ffmpeg_cmd = "ffmpeg -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 &"
-            missionResourceCommands.append(ffmpeg_cmd)
             
+        elif missiontype == "videography":
+            #for now we'll assume only one other computer see above
+            thisResourceInfo = resources[0].__dict__
+            resourceAddresses = thisResourceInfo['resourceAddresses']
+            externalIP = resourceAddresses[1][1]
+            missionResourceCommands = []
+            #open up the ports... maybe there is a more precise way to do this
+            missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
+            #run iperf3
+            missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
+            #start docker
+            missionResourceCommands.append("sudo systemctl start docker")
+            #get darknet container
+            missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
+            #clone coconet github
+            missionResourceCommands.append("git clone https://github.com/papajim/pegasus-coconet.git")
+            #make directory for incoming images
+            missionResourceCommands.append("mkdir /home/cc/images");
+            #maybe install something to receive frames?
+            #like this as an example? https://pyshine.com/Send-video-over-UDP-socket-in-Python/
+            
+        
+            #install ffmpeg for now... centos 7 requires the repo install
+            #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
+            #missionResourceCommands.append("sudo yum -y install ffmpeg");
+            #missionResourceCommands.append("mkdir /home/cc/ffmpeg");
+            #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 > /home/cc/ffmpeg/ffmpeg.log 2>&1 < /dev/null &"
+            #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -f mpegts udp://" + externalIP + ":24000"
+            #missionResourceCommands.append(ffmpeg_cmd)
+                                           
     return missionResourceCommands
 
 def getPlanFromPlanfile(filepath):
@@ -136,7 +162,7 @@ class FlyPawBasestationAgent(object):
         #for mission data, we should probably be checking elsewhere... for now we'll just define a mission here:
         mission = missionInfo()
         mission.name = "AERPAW"
-        mission.missionType = "bandwidth" #"videography"
+        mission.missionType = "videography" #'bandwidth', "videography"
         mission.missionLeader = "drone" #or basestation or cloud
         mission.priority = 1
         mission.planfile = "./plans/mission.plan"
