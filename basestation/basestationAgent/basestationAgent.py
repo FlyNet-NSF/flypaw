@@ -385,7 +385,7 @@ class FlyPawBasestationAgent(object):
                     # configure anything on the basestation
                     fail = configureBasestationProcesses(self.missions[0],self.resourceList)
                     if (fail):
-                        msgFromServer['missionstatus'] = "failed"
+                        msgFromServer['missionstatus'] = "canceled"
                         #delete the cloud resources 
                         self.cloud_mgr.delete()
                         
