@@ -22,6 +22,36 @@ from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo
 #import aerpawlib
 from datetime import datetime
 
+def configureBasestationProcesses(mission, resources):
+    thisMission = mission.__dict__
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
+        if missiontype == "videography":
+            #videography mission uses prometheus... configure and run
+            prometheus_config_array = []
+            prometheus_config_obj = {}
+            resource_ip_array = []
+            for resource in resources:
+                thisResourceInfo = resource.__dict__
+                resourceAddresses = thisResourceInfo['resourceAddresses']
+                externalIP = resourceAddresses[1][1]
+                externalIPandPort = externalIP + ":9100"
+                resource_ip_array.append(externalIPandPort)
+
+            prometheus_config_obj['labels'] = {}
+            prometheus_config_obj['labels']['job'] = "node"
+            prometheus_config_obj['targets'] = resource_ip_array
+            prometheus_config_array.append(prometheus_config_obj)
+            try:
+                with open("/root/prometheus/targets.json", "w") as ofile:
+                    json.dump(prometheus_config_array,ofile)
+            except IOError:
+                print("could not open prometheus config file")
+                return 1
+
+            return 0
+
+                
 def getMissionLibraries(mission):
     thisMission = mission.__dict__
     missionLibraries = []
@@ -58,6 +88,7 @@ def getMissionResourceCommands(mission, resources):
             
         elif missiontype == "videography":
             #for now we'll assume only one other computer see above
+            
             thisResourceInfo = resources[0].__dict__
             resourceAddresses = thisResourceInfo['resourceAddresses']
             externalIP = resourceAddresses[1][1]
@@ -68,6 +99,12 @@ def getMissionResourceCommands(mission, resources):
             missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
             #start docker
             missionResourceCommands.append("sudo systemctl start docker")
+            #get prometheus node exporter 
+            missionResourceCommands.append("wget https://github.com/prometheus/node_exporter/releases/download/v1.0.0-rc.0/node_exporter-1.0.0-rc.0.linux-amd64.tar.gz")
+            #untar prometheus node exporter
+            missionResourceCommands.append("sudo tar -zxvf node_exporter-1.0.0-rc.0.linux-amd64.tar.gz -C /opt")
+            #run prometheus node exporter
+            missionResourceCommands.append("/opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter")
             #get darknet container
             missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
             #clone coconet github
@@ -77,7 +114,7 @@ def getMissionResourceCommands(mission, resources):
             #maybe install something to receive frames?
             #like this as an example? https://pyshine.com/Send-video-over-UDP-socket-in-Python/
             
-        
+                
             #install ffmpeg for now... centos 7 requires the repo install
             #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
             #missionResourceCommands.append("sudo yum -y install ffmpeg");
@@ -344,6 +381,14 @@ class FlyPawBasestationAgent(object):
                             self.resourceList.append(thisResourceInfo)
                     print("giving resources 60 seconds to come online")
                     time.sleep(60)
+
+                    # configure anything on the basestation
+                    fail = configureBasestationProcesses(self.missions[0],self.resourceList)
+                    if (fail):
+                        msgFromServer['missionstatus'] = "failed"
+                        #delete the cloud resources 
+                        self.cloud_mgr.delete()
+                        
                     # configure nodes
                     """
                     Mission Library Installation on Cloud Nodes
