@@ -31,9 +31,10 @@ def configurePrometheusForResources(resources):
         thisResourceInfo = resource.__dict__
         resourceAddresses = thisResourceInfo['resourceAddresses']
         externalIP = resourceAddresses[1][1]
-        externalIPandPort = externalIP + ":9100"
-        resource_ip_array.append(externalIPandPort)
-
+        externalIPandPort = externalIP + ":8095"
+        if externalIPandPort not in resource_ip_array:
+            resource_ip_array.append(externalIPandPort)
+        
     prometheus_config_obj['labels'] = {}
     prometheus_config_obj['labels']['job'] = "node"
     prometheus_config_obj['targets'] = resource_ip_array
@@ -41,10 +42,12 @@ def configurePrometheusForResources(resources):
     try:
         with open("/root/prometheus/targets.json", "w") as ofile:
             json.dump(prometheus_config_array,ofile)
+            ofile.close()
     except IOError:
         print("could not open prometheus config file")
         return 1
     #tell prometheus to reload config
+    time.sleep(1)
     updateresp = requests.post(prometheusReloadURL, data={})
     if updateresp.status_code == 200:
         print("Prometheus configured and reloaded")
@@ -117,7 +120,7 @@ def getMissionResourceCommands(mission, resources):
             #untar prometheus node exporter
             missionResourceCommands.append("sudo tar -zxvf node_exporter-1.0.0-rc.0.linux-amd64.tar.gz -C /opt")
             #run prometheus node exporter
-            missionResourceCommands.append("/opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter")
+            missionResourceCommands.append("nohup /opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter --web.listen-address=':8095' > /home/cc/node_exporter.log 2>&1 &")
             #get darknet container
             missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
             #clone coconet github
