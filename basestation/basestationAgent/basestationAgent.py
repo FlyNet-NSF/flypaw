@@ -22,34 +22,47 @@ from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo
 #import aerpawlib
 from datetime import datetime
 
+def configurePrometheusForResources(resources):
+    prometheusReloadURL = "http://127.0.0.1:9090/-/reload"
+    prometheus_config_array = []
+    prometheus_config_obj = {}
+    resource_ip_array = []
+    for resource in resources:
+        thisResourceInfo = resource.__dict__
+        resourceAddresses = thisResourceInfo['resourceAddresses']
+        externalIP = resourceAddresses[1][1]
+        externalIPandPort = externalIP + ":9100"
+        resource_ip_array.append(externalIPandPort)
+
+    prometheus_config_obj['labels'] = {}
+    prometheus_config_obj['labels']['job'] = "node"
+    prometheus_config_obj['targets'] = resource_ip_array
+    prometheus_config_array.append(prometheus_config_obj)
+    try:
+        with open("/root/prometheus/targets.json", "w") as ofile:
+            json.dump(prometheus_config_array,ofile)
+    except IOError:
+        print("could not open prometheus config file")
+        return 1
+    #tell prometheus to reload config
+    updateresp = requests.post(prometheusReloadURL, data={})
+    if updateresp.status_code == 200:
+        print("Prometheus configured and reloaded")
+    else:
+        print("Prometheus reload failed with status_code: " + str(status_code))
+        return 1
+    return 0
+
 def configureBasestationProcesses(mission, resources):
     thisMission = mission.__dict__
     if 'missionType' in thisMission:
         missiontype = thisMission['missionType']
         if missiontype == "videography":
             #videography mission uses prometheus... configure and run
-            prometheus_config_array = []
-            prometheus_config_obj = {}
-            resource_ip_array = []
-            for resource in resources:
-                thisResourceInfo = resource.__dict__
-                resourceAddresses = thisResourceInfo['resourceAddresses']
-                externalIP = resourceAddresses[1][1]
-                externalIPandPort = externalIP + ":9100"
-                resource_ip_array.append(externalIPandPort)
-
-            prometheus_config_obj['labels'] = {}
-            prometheus_config_obj['labels']['job'] = "node"
-            prometheus_config_obj['targets'] = resource_ip_array
-            prometheus_config_array.append(prometheus_config_obj)
-            try:
-                with open("/root/prometheus/targets.json", "w") as ofile:
-                    json.dump(prometheus_config_array,ofile)
-            except IOError:
-                print("could not open prometheus config file")
+            prometheusFail = configurePrometheusForResources(resources)
+            if (prometheusFail):
                 return 1
-
-            return 0
+    return 0
 
                 
 def getMissionLibraries(mission):
@@ -360,8 +373,13 @@ class FlyPawBasestationAgent(object):
                     if flightsubmitresp.status_code == 200:
                         registerResp['registration'] = "OK"
                     else:
+                        print("could not register flight in ACS")
                         registerResp['registration'] = "FAILED"
+                        print(json.dumps(registerResp))
+                        msgFromServer['missionstatus'] = "canceled"
+                        return
 
+                    #if we're registered properly...
                     #get cloud resources and configure to mission
                     self.cloud_mgr.create()
                     time.sleep(3)
@@ -382,14 +400,15 @@ class FlyPawBasestationAgent(object):
                     print("giving resources 60 seconds to come online")
                     time.sleep(60)
 
-                    # configure anything on the basestation
+                    # Now that you have the IP addresses, configure anything on the basestation
                     fail = configureBasestationProcesses(self.missions[0],self.resourceList)
                     if (fail):
                         msgFromServer['missionstatus'] = "canceled"
                         #delete the cloud resources 
                         self.cloud_mgr.delete()
+                        return
                         
-                    # configure nodes
+                    # now configure nodes...
                     """
                     Mission Library Installation on Cloud Nodes
                     """
@@ -421,8 +440,8 @@ class FlyPawBasestationAgent(object):
                                 print(stdout)
                                 print(stderr)
 
-                    # ideally this would be coordinated be done through KubeCtl or something, but initially we'll 
-                    # just start up the iperf3 server in configuration
+                    #now install and run any preflight commands/configuration on the nodes
+                    # ideally this would be coordinated be done through KubeCtl or something
                     missionResourceCommands = getMissionResourceCommands(self.missions[0],self.resourceList)
                     for s in slices:
                         for node in s.get_nodes():
