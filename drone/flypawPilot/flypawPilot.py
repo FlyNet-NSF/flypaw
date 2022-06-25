@@ -221,7 +221,7 @@ class FlyPawPilot(StateMachine):
         #likely a lot more to check... 
 
         #ok, try to accept mission
-        print("accepting mission... this can take up to 10 minutes to get confirmation while cloud resources are reserved")
+        print("accepting mission... this can take up to 15 minutes to get confirmation while cloud resources are reserved")
         missionAccepted = acceptMission(self.basestationIP, self.missions[0])
         if missionAccepted:
             print (self.missions[0].missionType + " mission accepted")
@@ -594,7 +594,7 @@ class FlyPawPilot(StateMachine):
                 if (address[0] == "external"):
                     externalIP = address[1]
             if externalIP is not None:
-	        print("external IP: " + str(externalIP))
+                print("external IP: " + str(externalIP))
             else:
                 print("no external IP address found for node: " + resource.name)
                 return "nextAction"
@@ -896,6 +896,7 @@ def validateRequest(request):
     validReq.append("iperf")
     validReq.append("waypoint_entry")
     validReq.append("flight")
+    validReq.append("sendFrame")
     validReq.append("sendVideo")
     validReq.append("collectVideo")
     validReq.append("instructionRequest")
@@ -1016,8 +1017,8 @@ def acceptMission(basestationIP, thismission):
     msg = {}
     msg['uuid'] = str(x)
     msg['type'] = "acceptMission"
-    #wait up to 10 minutes for cloud resources to be procured after accepting mission
-    serverReply = udpClientMsg(msg, basestationIP, 20001, 600)
+    #wait up to 15 minutes for cloud resources to be procured after accepting mission
+    serverReply = udpClientMsg(msg, basestationIP, 20001, 900)
     if serverReply is not None:
         print(serverReply['uuid_received'])
         if serverReply['uuid_received'] == str(x):
@@ -1039,7 +1040,8 @@ def getEntryMissionActions(missiontype):
         mission_actions.append('iperf')
     elif missiontype == "videography":
         mission_actions.append('iperf')
-        mission_actions.append('sendVideo')
+        mission_actions.append('sendFrame')
+        #mission_actions.append('sendVideo')
     return mission_actions
 
 def logState(logfile, state):
