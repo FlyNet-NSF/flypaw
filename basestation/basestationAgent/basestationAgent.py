@@ -130,7 +130,7 @@ def getMissionResourceCommands(mission, resources):
             #get receive_file_udp to receive image files and run darknet
             missionResourceCommands.append("wget https://emmy8.casa.umass.edu/flypaw/cloud/receive_file_udp/receive_file_udp.py")
             #run receive_file_udp
-            #missionResourceCommands.append("nohup python3 receive_file_udp.py > /home/cc/receive_file_udp.log 2>&1 &")
+            missionResourceCommands.append("nohup python3 receive_file_udp.py > /home/cc/receive_file_udp.log 2>&1 &")
                             
             #install ffmpeg for now... centos 7 requires the repo install
             #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
