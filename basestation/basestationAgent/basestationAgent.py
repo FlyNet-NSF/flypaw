@@ -9,7 +9,7 @@ import requests
 import time
 from mobius.controller.controller import Controller
 
-from flypawClasses import iperfInfo, sendVideoInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
+from flypawClasses import iperfInfo, sendVideoInfo, sendFrameInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
 
 #from cloud_resources import CloudResources
 
@@ -197,6 +197,7 @@ class FlyPawBasestationAgent(object):
         self.chunkSize = chunkSize
         self.iperf3Agent = iperfInfo()
         self.videoTransferAgent = sendVideoInfo()
+        self.frameTransferAgent = sendFrameInfo()
         self.videoCollectionAgent = collectVideoInfo()
         self.flightInfo = flightInfo()
         self.missions = []
@@ -209,6 +210,7 @@ class FlyPawBasestationAgent(object):
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
         self.vehicleCommands.setCollectVideoCommand(self.videoCollectionAgent)
         self.vehicleCommands.setSendVideoCommand(self.videoTransferAgent)
+        self.vehicleCommands.setSendFrameCommand(self.frameTransferAgent)
         self.acs = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightPath"
         self.usrname = "admin"
         self.password = "shabiz"

@@ -48,6 +48,13 @@ class collectVideoInfo(object):
         self.quality = quality #arbitrary unit
         self.priority = priority #normalized float 0-1
 
+class sendFrameInfo(object):
+    def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="8096", priority=1):
+        self.dataformat = jpgframes #jpgframes, ffmpeg, etc
+        self.ipaddr = ipaddr #string ip address
+        self.port = port #int port number
+        self.priority = priority #normalized float 0-1
+        
 class sendVideoInfo(object):
     def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="23000", priority=1):
         self.dataformat = dataformat #jpgframes, ffmpeg, etc
@@ -91,7 +98,8 @@ class resourceInfo(object):
 class VehicleCommands(object):
     def __init__(self):
         self.commands = {}
-        self.commands['iperf'] = {} 
+        self.commands['iperf'] = {}
+        self.commands['sendFrame'] = {}
         self.commands['sendVideo'] = {} 
         self.commands['collectVideo'] = {}
         self.commands['flight'] = {}
@@ -100,6 +108,8 @@ class VehicleCommands(object):
         self.commands['iperf'] = { "command" : "iperf", "protocol": iperfObj.protocol, "ipaddr": iperfObj.ipaddr, "port": iperfObj.port, "priority": iperfObj.priority } 
     def setCollectVideoCommand(self, collectVideoObj):
         self.commands['collectVideo'] = { "command" : "collectVideo", "dataformat" : collectVideoObj.dataformat, "duration": collectVideoObj.duration, "quality": collectVideoObj.quality, "priority": collectVideoObj.priority }
+    def setSendFrameCommand(self, sendFrameObj):
+        self.commands['sendFrame'] = { "command" : "sendFrame", "dataformat" : sendFrameObj.dataformat, "ipaddr": sendFrameObj.ipaddr, "port": sendFrameObj.port, "priority": sendFrameObj.priority  }
     def setSendVideoCommand(self, sendVideoObj):
         self.commands['sendVideo'] = { "command" : "sendVideo", "dataformat" : sendVideoObj.dataformat, "ipaddr": sendVideoObj.ipaddr, "port": sendVideoObj.port, "priority": sendVideoObj.priority  }
     def setFlightCommand(self, flightObj):
