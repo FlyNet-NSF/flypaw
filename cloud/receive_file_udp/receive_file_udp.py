@@ -19,9 +19,10 @@ except socket.error:
     sys.exit()
     
 while True:
-    batch, client = udpsocket.recvfrom(1024).decode()
+    batch, client = udpsocket.recvfrom(1024)
     if batch:
-        fname = outputDir + "/" + batch.strip()
+        decodedBatch = batch.decode('utf-8')
+        fname = outputDir + "/" + decodedBatch.strip()
 
     try:
         ofile = open(fname, 'wb')
@@ -32,7 +33,8 @@ while True:
         done = select.select([udpsocket], [], [], 5)
         if done[0]:
             batch, client = sock.recvfrom(1024)
-            ofile.write(batch)
+            decodedBatch = batch.decode('utf-8')
+            ofile.write(decodedBatch)
         else:
             ofile.close()
             mountStr = outputDir + ":/coconet/dataset"
