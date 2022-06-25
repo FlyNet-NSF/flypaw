@@ -484,11 +484,13 @@ class FlyPawBasestationAgent(object):
                     self.iperfHistory.append(self.iperf3Agent)
                     if self.iperf3Agent.mbps is not None:
                         if self.iperf3Agent.mbps > 1:
-                            self.currentRequests.append(self.vehicleCommands.commands['sendVideo'])
+                            self.currentRequests.append(self.vehicleCommands.commands['sendFrame'])
                         else:
                             self.currentRequests.append(self.vehicleCommands.commands['flight'])
                     else:
                         self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "sendFrame":
+                    self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "sendVideo":
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "abortMission":
