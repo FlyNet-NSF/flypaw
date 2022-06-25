@@ -19,7 +19,7 @@ except socket.error:
     sys.exit()
     
 while True:
-    batch, client = udpsocket.recvfrom(1024)
+    batch, client = udpsocket.recvfrom(1024).decode()
     if batch:
         fname = outputDir + "/" + batch.strip()
 
