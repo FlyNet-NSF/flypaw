@@ -46,11 +46,11 @@ class FlyPawPilot(StateMachine):
         self.nextStates = []
         self.logfiles = {}
         self.videoLocation = "/root/video/video_diff_resolution/example1/video_1280_720.mpg"
-        #hardcode this for now
-        
-        self.basestationIP = "172.16.0.1"
+        self.frameLocation = "/root/video/video_diff_resolution/example_frames"
+        self.basestationIP = "172.16.0.1" #other side of the radio link
         self.videoURL = "udp://" + self.basestationIP + ":23000"
-        self.frame = 0
+        #frame can be used for sendVideo or sendFrame depending on mission type
+        self.frame = 1
         
         now = datetime.now()
         current_timestring = now.strftime("%Y%m%d-%H%M%S")
@@ -261,7 +261,7 @@ class FlyPawPilot(StateMachine):
         Mission Specific Update Now that we have resource IP addresses
         """
         self.videoURL = "udp://" + externalIP + ":23000"
-
+        
         
         #configureResources should block up to 5 minutes while configuring 
         #configureResources(missionLibraries, self.resources[0])
@@ -578,6 +578,45 @@ class FlyPawPilot(StateMachine):
         self.currentIperfObjArr.append(iperfObjArr)
         return "nextAction"
 
+    @state(name="sendFrame")
+    async def sendFrame(self, _ ):
+        logState(self.logfiles['state'], "sendFrame")
+        if (self.frame > 1401): #only because the test data has like 1450 frames
+            self.frame = 1
+        framestr = str(self.frame).zfill(7) + ".jpg"
+        framefn = self.frameLocation + "/" + framestr
+        #maybe use prometheus here to decide where to send
+        #punt for now
+        for resource in self.resources:
+            externalIP = None
+            for address in resource.resourceAddresses:
+                print("address type: " + address[0])
+                if (address[0] == "external"):
+                    externalIP = address[1]
+            if externalIP is not None:
+	        print("external IP: " + str(externalIP))
+            else:
+                print("no external IP address found for node: " + resource.name)
+                return "nextAction"
+            
+        fileSendFail = udpFileSend(framefn, externalIP, 8096, 1024) #try 1024 for buffer size for now
+        if fileSendFail:
+            print("couldn't send video")
+        else:
+            self.frame = self.frame + 50
+            
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "sendFrame"
+        msg['sendFrame'] = {}
+        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+        return "nextAction"
+    
     @state(name="sendVideo")
     async def sendVideo(self, _ ):
         print("sendVideo")
@@ -601,7 +640,7 @@ class FlyPawPilot(StateMachine):
         msg = {}
         msg['uuid'] = str(x)
         msg['type'] = "sendVideo"
-        msg['collectVideo'] = {}
+        msg['sendVideo'] = {}
         serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
         if serverReply is not None:
             print(serverReply['uuid_received'])
@@ -1044,3 +1083,31 @@ def udpClientMsg(msg, address, port, timeout_in_seconds):
         print(pe)
         return None
         
+def udpFileSend(filename, address, port, buffersz):
+    #buffersz could be 1024 or 4096... not sure the best value 
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    except socket.error:
+        print("could not create udp socket")
+        return 1
+    try:
+        sock.sendto(filename, (address, port))
+    except socket.error:
+        print("could not send filename")
+        return 1
+
+    try:
+        ifile = open(filename, "r")
+    except IOerror:
+        print("could not find file: " + filename)
+        return 1
+
+    chunk = ifile.read(buffersz)
+    while (chunk):
+        if sock.sendto(chunk, (address, port)):
+            chunk = ifile.read(buffersz)
+            time.sleep(0.02)
+
+    sock.close()
+    ifile.close()
+    return 0
