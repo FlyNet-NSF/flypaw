@@ -1093,7 +1093,7 @@ def udpFileSend(filename, address, port, buffersz):
         print("could not create udp socket")
         return 1
     try:
-        sock.sendto(filename, (address, port))
+        sock.sendto(filename.encode(), (address, port))
     except socket.error:
         print("could not send filename")
         return 1
@@ -1106,7 +1106,7 @@ def udpFileSend(filename, address, port, buffersz):
 
     chunk = ifile.read(buffersz)
     while (chunk):
-        if sock.sendto(chunk, (address, port)):
+        if sock.sendto(chunk.encode(), (address, port)):
             chunk = ifile.read(buffersz)
             time.sleep(0.02)
 
