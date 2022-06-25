@@ -50,7 +50,7 @@ class collectVideoInfo(object):
 
 class sendFrameInfo(object):
     def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="8096", priority=1):
-        self.dataformat = jpgframes #jpgframes, ffmpeg, etc
+        self.dataformat = dataformat #jpgframes, ffmpeg, etc
         self.ipaddr = ipaddr #string ip address
         self.port = port #int port number
         self.priority = priority #normalized float 0-1
