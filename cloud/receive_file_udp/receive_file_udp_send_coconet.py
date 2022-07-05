@@ -6,16 +6,7 @@ from argparse import ArgumentParser
 
 #outputDir = "/home/cc/dataset"
 #bindIP = "0.0.0.0"
-#bindPort = 8096
-
-#            mountStr = outputDir + ":/coconet/dataset"
-#            try:
-#                with open("/home/cc/darknet.log", "a") as darknetlog:
-#                    subprocess.call(['sudo', 'docker', 'run', '-it', '-v', mountStr, 'papajim/detectionmodule:latest', '/coconet/darknet', 'detect', 'cfg/yolov3.cfg', 'yolov3.weights', fname], shell=True, stdout=darknetlog, stderr=darknetlog)
-#            except IOerror:
-#                print("could not open darknet log and run darknet.  Skipped.")
-#            break
-
+#port = 8096
         
 if __name__ == '__main__':
     parser = ArgumentParser(description="File Transfer Server")
