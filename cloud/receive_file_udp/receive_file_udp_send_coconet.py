@@ -29,7 +29,8 @@ if __name__ == '__main__':
     address = args.address
     port = args.port
     buffersz = args.buffersz
-
+    mountStr = outputdir + ":/coconet/dataset"
+    
     try:
         udpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except OSerror:
@@ -64,5 +65,10 @@ if __name__ == '__main__':
             else:
                 ofile.close()
                 print(fname + " written")
+                try:
+                    with open("/home/cc/darknet.log", "a") as darknetlog:
+                        subprocess.call(['sudo', 'docker', 'run', '-it', '-v', mountStr, 'papajim/detectionmodule:latest', '/coconet/darknet', 'detect','cfg/yolov3.cfg', 'yolov3.weights', fname], shell=True, stdout=darknetlog, stderr=darknetlog)
+                except IOerror:
+                    print("could not open darknet log and run darknet.  Skipped.")
                 break
 
