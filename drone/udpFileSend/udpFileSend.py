@@ -41,7 +41,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description="File Transfer Client")
     parser.add_argument("-f", "--filename", metavar="FILENAME", type=str, help="location of file to transfer", required=True)
     parser.add_argument("-a", "--address", metavar="ADDRESS", type=str, help="IP address of server", required=True)
-    parser.add_argument("-p", "--port", metavar="PORT", type=int, help="Server port", required=False)
+    parser.add_argument("-p", "--port", metavar="PORT", type=int, help="Server port", required=True)
     parser.add_argument("-b", "--buffersz", metavar="BUFFERSZ", type=int, help="Buffer size to read", required=True)
 
     args = parser.parse_args()
