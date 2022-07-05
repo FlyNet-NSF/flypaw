@@ -1084,7 +1084,7 @@ def udpClientMsg(msg, address, port, timeout_in_seconds):
     except pickle.PicklingError as pe:
         print(pe)
         return None
-        
+
 def udpFileSend(filename, address, port, buffersz):
     #buffersz could be 1024 or 4096... not sure the best value 
     try:
@@ -1092,24 +1092,27 @@ def udpFileSend(filename, address, port, buffersz):
     except socket.error:
         print("could not create udp socket")
         return 1
+    #strip out basename
+    basename = os.path.basename(filename)
     try:
-        sock.sendto(filename.encode(), (address, port))
+        sock.sendto(basename.encode(), (address, port))
     except socket.error:
         print("could not send filename")
         return 1
 
     try:
-        ifile = open(filename, "r")
+        ifile = open(filename, "rb")
     except IOerror:
         print("could not find file: " + filename)
         return 1
 
     chunk = ifile.read(buffersz)
     while (chunk):
-        if sock.sendto(chunk.encode(), (address, port)):
+        if sock.sendto(chunk, (address, port)):
             chunk = ifile.read(buffersz)
             time.sleep(0.02)
 
     sock.close()
     ifile.close()
     return 0
+
