@@ -21,7 +21,7 @@ if __name__ == '__main__':
     port = args.port
     buffersz = args.buffersz
     mountStr = outputdir + ":/coconet/dataset"
-    
+    darknetCall = "sudo docker run -it -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights" + fname
     try:
         udpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except OSerror:
@@ -45,9 +45,10 @@ if __name__ == '__main__':
 
         try:
             ofile = open(fname, 'wb')
-        except IOerror:
+        except FileNotFoundError:
             print ("could not open file: " + fname)
 
+            
         while True:
             done = select.select([udpsocket], [], [], 5)
             if done[0]:
@@ -56,10 +57,9 @@ if __name__ == '__main__':
             else:
                 ofile.close()
                 print(fname + " written")
-                try:
-                    with open("/home/cc/darknet.log", "a") as darknetlog:
-                        subprocess.call(['sudo', 'docker', 'run', '-it', '-v', mountStr, 'papajim/detectionmodule:latest', '/coconet/darknet', 'detect','cfg/yolov3.cfg', 'yolov3.weights', fname], shell=True, stdout=darknetlog, stderr=darknetlog)
-                except IOerror:
-                    print("could not open darknet log and run darknet.  Skipped.")
+                
+                with open("/home/cc/darknet.log", "a") as darknetlog:
+                    subprocess.call(darknetCall, shell=True, stdout=darknetlog, stderr=darknetlog)
+                
                 break
 
