@@ -2,7 +2,8 @@ import sys
 import socket
 import select
 from argparse import ArgumentParser
-#import subprocess
+import os
+import subprocess
 
 #outputDir = "/home/cc/dataset"
 #bindIP = "0.0.0.0"
@@ -21,7 +22,6 @@ if __name__ == '__main__':
     port = args.port
     buffersz = args.buffersz
     mountStr = outputdir + ":/coconet/dataset"
-    darknetCall = "sudo docker run -it -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights" + fname
     try:
         udpsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     except OSerror:
@@ -42,7 +42,7 @@ if __name__ == '__main__':
         if batch:
             decodedBatch = batch.decode('utf-8')
             fname = outputdir + "/" + decodedBatch.strip()
-
+	
         try:
             ofile = open(fname, 'wb')
         except FileNotFoundError:
@@ -57,7 +57,7 @@ if __name__ == '__main__':
             else:
                 ofile.close()
                 print(fname + " written")
-                
+                darknetCall = "sudo docker run -it -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights " + fname
                 with open("/home/cc/darknet.log", "a") as darknetlog:
                     subprocess.call(darknetCall, shell=True, stdout=darknetlog, stderr=darknetlog)
                 
