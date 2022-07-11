@@ -68,80 +68,86 @@ def configureBasestationProcesses(mission, resources):
     return 0
 
                 
-def getMissionLibraries(mission):
-    thisMission = mission.__dict__
-    missionLibraries = []
-    if 'missionType' in thisMission:
-        missiontype = thisMission['missionType']
-        if missiontype == "bandwidth":
-            #iperf
-            missionLibraries.append("iperf3")
-            #ffmpeg --> maybe move to a different mission
-            missionLibraries.append("epel-release")
-        elif missiontype == "videography":
-            missionLibraries.append("iperf3")
-            missionLibraries.append("epel-release")
-            missionLibraries.append("docker")
-    return missionLibraries
-
-def getMissionResourceCommands(mission, resources):
+def getMissionLibraries(mission, resources):
     thisMission = mission.__dict__
     if 'missionType' in thisMission:
         missiontype = thisMission['missionType']
+        missionLibraries = []
         if missiontype == "bandwidth":
-            #for this mission we'll assume only one other computer
-            thisResourceInfo = resources[0].__dict__
-            resourceAddresses =	thisResourceInfo['resourceAddresses']
-            #generally address 0 is management IP, address 1 external IP...they could be the same
-            #resourceAddress is a pair eg. ['external', 'xxx.xxx.xxx.xxx']
-            #could cycle through each address and look for external as first part of pair rather than just assume
-            externalIP = resourceAddresses[1][1]
-            missionResourceCommands = []
-            #open up the ports... maybe there is a more precise way to do this
-            missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
-            #run iperf3
-            missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
-            
+            for thisResource in resources: #same libraries for each resource in this case
+                resourceLibraries = []
+                resourceLibraries.append("iperf3")
+                missionLibraries.append(resourceLibraries)
         elif missiontype == "videography":
-            #for now we'll assume only one other computer see above
-            
-            thisResourceInfo = resources[0].__dict__
-            resourceAddresses = thisResourceInfo['resourceAddresses']
-            externalIP = resourceAddresses[1][1]
-            missionResourceCommands = []
-            #open up the ports... maybe there is a more precise way to do this
-            missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
-            #run iperf3
-            missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
-            #start docker
-            missionResourceCommands.append("sudo systemctl start docker")
-            #get prometheus node exporter 
-            missionResourceCommands.append("wget https://github.com/prometheus/node_exporter/releases/download/v1.0.0-rc.0/node_exporter-1.0.0-rc.0.linux-amd64.tar.gz")
-            #untar prometheus node exporter
-            missionResourceCommands.append("sudo tar -zxvf node_exporter-1.0.0-rc.0.linux-amd64.tar.gz -C /opt")
-            #run prometheus node exporter
-            missionResourceCommands.append("nohup /opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter --web.listen-address=':8095' > /home/cc/node_exporter.log 2>&1 &")
-            #get darknet container
-            missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
-            #clone coconet github
-            missionResourceCommands.append("git clone https://github.com/papajim/pegasus-coconet.git")
-            #make directory for incoming images
-            missionResourceCommands.append("mkdir /home/cc/dataset");
-            #get receive_file_udp to receive image files and run darknet
-            missionResourceCommands.append("wget https://emmy8.casa.umass.edu/flypaw/cloud/receive_file_udp/receive_file_udp_send_coconet.py")
-            #run receive_file_udp
-            missionResourceCommands.append("nohup python3 receive_file_udp_send_coconet.py -o /home/cc/dataset -a '0.0.0.0' -p 8096 -b 4096 > /home/cc/receive_file_udp.log 2>&1 &")
-                            
-            #install ffmpeg for now... centos 7 requires the repo install
-            #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
-            #missionResourceCommands.append("sudo yum -y install ffmpeg");
-            #missionResourceCommands.append("mkdir /home/cc/ffmpeg");
-            #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 > /home/cc/ffmpeg/ffmpeg.log 2>&1 < /dev/null &"
-            #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -f mpegts udp://" + externalIP + ":24000"
-            #missionResourceCommands.append(ffmpeg_cmd)
-                                           
-    return missionResourceCommands
+            for thisResource in resources: #same libraries for each resource in this case
+                resourceLibraries = []
+                resourceLibraries.append("iperf3")
+                resourceLibraries.append("epel-release")
+                resourceLibraries.append("docker")
+                missionLibraries.append(resourceLibraries)
+        return missionLibraries
+    else:
+        return None
 
+def getMissionResourcesCommands(mission, resources):
+    thisMission = mission.__dict__
+    
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
+        missionResourcesCommands = [] #one list of commands per resource
+        if missiontype == "bandwidth":
+            for thisResource in resources:
+                thisResourceInfo = thisResource.__dict__
+                missionResourceCommands = []
+                #open up the ports... maybe there is a more precise way to do this
+                missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
+                #run iperf3
+                missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
+                missionResourcesCommands.append(missionResourceCommands)
+        elif missiontype == "videography":
+            for thisResource in resources:
+                thisResourceInfo = thisResource.__dict__
+                resourceAddresses = thisResourceInfo['resourceAddresses']
+                #generally address 0 is management IP, address 1 external IP...they could be the same
+                #resourceAddress is a pair eg. ['external', 'xxx.xxx.xxx.xxx']
+                #could cycle through each address and look for external as first part of pair rather than just assume
+                externalIP = resourceAddresses[1][1]
+                missionResourceCommands = []
+                #open up the ports... maybe there is a more precise way to do this
+                missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
+                #run iperf3
+                missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
+                #start docker
+                missionResourceCommands.append("sudo systemctl start docker")
+                #get prometheus node exporter 
+                missionResourceCommands.append("wget https://github.com/prometheus/node_exporter/releases/download/v1.0.0-rc.0/node_exporter-1.0.0-rc.0.linux-amd64.tar.gz")
+                #untar prometheus node exporter
+                missionResourceCommands.append("sudo tar -zxvf node_exporter-1.0.0-rc.0.linux-amd64.tar.gz -C /opt")
+                #run prometheus node exporter
+                missionResourceCommands.append("nohup /opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter --web.listen-address=':8095' > /home/cc/node_exporter.log 2>&1 &")
+                #get darknet container
+                missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
+                #clone coconet github
+                missionResourceCommands.append("git clone https://github.com/papajim/pegasus-coconet.git")
+                #make directory for incoming images
+                missionResourceCommands.append("mkdir /home/cc/dataset");
+                #get receive_file_udp to receive image files and run darknet
+                missionResourceCommands.append("wget https://emmy8.casa.umass.edu/flypaw/cloud/receive_file_udp/receive_file_udp_send_coconet.py")
+                #run receive_file_udp
+                missionResourceCommands.append("nohup python3 receive_file_udp_send_coconet.py -o /home/cc/dataset -a '0.0.0.0' -p 8096 -b 4096 > /home/cc/receive_file_udp.log 2>&1 &")
+
+                missionResourcesCommands.append(missionResourceCommands)
+                #install ffmpeg for now... centos 7 requires the repo install
+                #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
+                #missionResourceCommands.append("sudo yum -y install ffmpeg");
+                #missionResourceCommands.append("mkdir /home/cc/ffmpeg");
+                #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 > /home/cc/ffmpeg/ffmpeg.log 2>&1 < /dev/null &"
+                #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -f mpegts udp://" + externalIP + ":24000"
+                #missionResourceCommands.append(ffmpeg_cmd)
+                
+        return missionResourcesCommands
+    else:
+        return None
 def getPlanFromPlanfile(filepath):
     f = open(filepath)
     pathdata = json.load(f)
@@ -418,11 +424,10 @@ class FlyPawBasestationAgent(object):
                     """
                     Mission Library Installation on Cloud Nodes
                     """
-                    # need a mapping function of mission libraries to nodes... maybe for multiple missions also
-                    # for now just use the first mission and install all libraries on all nodes
-                    missionLibraries = getMissionLibraries(self.missions[0])
+                    missionLibraries = getMissionLibraries(self.missions[0], self.resourceList)
 
                     for s in slices:
+                        nodeno = 0
                         for node in s.get_nodes():
                             nodeName = node.get_name()
                             print("Install Libraries for nodeName: " + nodeName)
@@ -438,27 +443,29 @@ class FlyPawBasestationAgent(object):
                             #stdout, stderr = node.execute(swapRepoStr)
                             #print(stdout)
                             #print(stderr)
-                            for library in missionLibraries:
+                            for library in missionLibraries[nodeno]:
                                 #libraryInstallStr = "sudo dnf -y install " + library #centos8 
                                 libraryInstallStr = "sudo yum -y install " + library #centos7
                                 print(nodeName + ": " + libraryInstallStr)
                                 stdout, stderr = node.execute(libraryInstallStr)
                                 print(stdout)
                                 print(stderr)
+                            nodeno = nodeno + 1
 
                     #now install and run any preflight commands/configuration on the nodes
                     # ideally this would be coordinated be done through KubeCtl or something
-                    missionResourceCommands = getMissionResourceCommands(self.missions[0],self.resourceList)
+                    missionResourcesCommands = getMissionResourcesCommands(self.missions[0],self.resourceList)
                     for s in slices:
+                        nodeno = 0
                         for node in s.get_nodes():
                             nodeName = node.get_name()
                             print("Run Commands for nodeName: " + nodeName)
-                            for command in missionResourceCommands:
+                            for command in missionResourcesCommands[nodeno]:
                                 print("command: " + command)
                                 stdout, stderr = node.execute(command)
                                 print(stdout)
                                 print(stderr)
-
+                            nodeno = nodeno + 1
                     msgFromServer['missionstatus'] = "confirmed"
                     
                 elif msgType == "resourceInfo":
