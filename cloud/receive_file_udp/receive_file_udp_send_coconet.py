@@ -40,13 +40,13 @@ if __name__ == '__main__':
     while True:
         batch, client = udpsocket.recvfrom(1024)
         if batch:
-            decodedBatch = batch.decode('utf-8')
-            fname = outputdir + "/" + decodedBatch.strip()
+            filename = batch.decode('utf-8')
+            fpath = outputdir + "/" + filename.strip()
 	
         try:
-            ofile = open(fname, 'wb')
+            ofile = open(fpath, 'wb')
         except FileNotFoundError:
-            print ("could not open file: " + fname)
+            print ("could not open file: " + fpath)
 
             
         while True:
@@ -56,7 +56,9 @@ if __name__ == '__main__':
                 ofile.write(batch)
             else:
                 ofile.close()
-                print(fname + " written")
+                print(fpath + " written")
+                fname = "/coconet/dataset/" + filename
+
                 darknetCall = "sudo docker run -i -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights " + fname
                 with open("/home/cc/darknet.log", "a") as darknetlog:
                     subprocess.call(darknetCall, shell=True, stdout=darknetlog, stderr=darknetlog)
