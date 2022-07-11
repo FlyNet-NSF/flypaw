@@ -57,7 +57,7 @@ if __name__ == '__main__':
             else:
                 ofile.close()
                 print(fname + " written")
-                darknetCall = "sudo docker run -it -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights " + fname
+                darknetCall = "sudo docker run -i -v " + mountStr + " papajim/detectionmodule:latest /coconet/darknet detect cfg/yolov3.cfg yolov3.weights " + fname
                 with open("/home/cc/darknet.log", "a") as darknetlog:
                     subprocess.call(darknetCall, shell=True, stdout=darknetlog, stderr=darknetlog)
                 
