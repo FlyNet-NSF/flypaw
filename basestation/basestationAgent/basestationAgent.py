@@ -496,8 +496,12 @@ class FlyPawBasestationAgent(object):
                 elif msgType == "sendVideo":
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 elif msgType == "abortMission":
+                    print ("mission abort... prepare for landing")
+                elif msgType == "completed":
                     # delete the cloud resources
                     self.cloud_mgr.delete()
+                    print("flight complete")
+                    sys.exit()
                 else:
                     print("msgType: " + msgType)
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
