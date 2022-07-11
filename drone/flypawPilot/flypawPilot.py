@@ -691,8 +691,27 @@ class FlyPawPilot(StateMachine):
         print("land")
         await drone.land()
         print("flight complete")
+        return "completed"
+    
+    @scate(name="completed")
+    async def completed(self, _ ):
+        """
+        post flight cleanup
+        """
+        print("cleaning up")
+        logState(self.logfiles['state'], "completed")
+        x = uuid.uuid4()
+	msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "completed"
+        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+        print("exiting")
         sys.exit()
-
+        
     @state(name="nextAction")
     async def nextAction(self, _ ):
         #check to see if we have anything else pending to do                                                                                                                         
