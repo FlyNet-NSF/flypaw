@@ -1,4 +1,4 @@
-#import requests
+import requests
 import json
 #import geojson
 import time
@@ -49,6 +49,7 @@ class FlyPawPilot(StateMachine):
         self.frameLocation = "/root/video/video_diff_resolution/example_frames"
         self.basestationIP = "172.16.0.1" #other side of the radio link
         self.videoURL = "udp://" + self.basestationIP + ":23000"
+        self.prometheusQueryURL = "http://" + self.basestationIP + ":9090/api/v1/query?query=" 
         #frame can be used for sendVideo or sendFrame depending on mission type
         self.frame = 1
         
@@ -508,7 +509,7 @@ class FlyPawPilot(StateMachine):
         return nextSequence
         
         
-    @timed_state(name="iperf",duration = 5)
+    @timed_state(name="iperf",duration = 15)
     async def iperf(self, drone: Drone):
         logState(self.logfiles['state'], "iperf")
         iperfObjArr = []
@@ -525,7 +526,7 @@ class FlyPawPilot(StateMachine):
                 msg['type'] = "iperfResults"
                 msg['iperfResults'] = {}
                 client = iperf3.Client()
-                client.server_hostname = str(externalIP)
+                client.server_hostname = externalIP
                 #client.server_hostname = self.basestationIP
                 client.port = 5201
                 client.duration = 3
@@ -574,6 +575,8 @@ class FlyPawPilot(StateMachine):
                     else:
                         print("no reply from server while transmitting iperfResults")
                         self.communications['iperf'] = 0
+                #delete the iperf3 client to avoid errors
+                del client
         #at the end append all the individual iperf results to the self array
         self.currentIperfObjArr.append(iperfObjArr)
         return "nextAction"
@@ -585,36 +588,63 @@ class FlyPawPilot(StateMachine):
             self.frame = 1
         framestr = str(self.frame).zfill(7) + ".jpg"
         framefn = self.frameLocation + "/" + framestr
-        #maybe use prometheus here to decide where to send
-        #punt for now
+        
+        #figure out where to send
+        #i) check prometheus
+        up_array = []
+        load_array = []
         for resource in self.resources:
             externalIP = None
             for address in resource.resourceAddresses:
                 print("address type: " + address[0])
                 if (address[0] == "external"):
                     externalIP = address[1]
-            if externalIP is not None:
-                print("external IP: " + str(externalIP))
+                    statusQueryURL = self.prometheusQueryURL + 'up{instance="' + externalIP + ':8095"}'
+                    print("status query: " + statusQueryURL)
+                    nodeOnline = prometheusStatusQuery(statusQueryURL)
+                    nodeOnlineObj = {}
+                    nodeOnlineObj['externalIP'] = externalIP
+                    nodeOnlineObj['online'] = nodeOnline
+                    if nodeOnlineObj not in up_array:
+                        up_array.append(nodeOnlineObj)
+                    if nodeOnline:
+                        loadQueryURL = self.prometheusQueryURL + 'node_load1{instance="' + externalIP + ':8095"}'
+                        print("load query: " + loadQueryURL)
+                        loadResult = prometheusLoadQuery(loadQueryURL)
+                        loadObj = {}
+                        if loadResult is not None:
+                            loadObj['externalIP'] = externalIP
+                            loadObj['load'] = loadResult
+                            load_array.append(loadObj)
+
+        minload = 100.1
+        bestnode = None
+        for onlineNode in load_array:
+            load = float(onlineNode['load'])
+            print("node: " + onlineNode['externalIP'])
+            print("load: " + str(load))
+            if load < minload:
+                bestnode = onlineNode['externalIP']
+                minload = load
+        if bestnode is not None:
+            print("send to: " + bestnode)
+                    
+            fileSendFail = udpFileSend(framefn, bestnode, 8096, 1024) #try 1024 for buffer size for now
+            if fileSendFail:
+                print("couldn't send video")
             else:
-                print("no external IP address found for node: " + resource.name)
-                return "nextAction"
+                self.frame = self.frame + 50
             
-        fileSendFail = udpFileSend(framefn, externalIP, 8096, 1024) #try 1024 for buffer size for now
-        if fileSendFail:
-            print("couldn't send video")
-        else:
-            self.frame = self.frame + 50
-            
-        x = uuid.uuid4()
-        msg = {}
-        msg['uuid'] = str(x)
-        msg['type'] = "sendFrame"
-        msg['sendFrame'] = {}
-        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
-        if serverReply is not None:
-            print(serverReply['uuid_received'])
-            if serverReply['uuid_received'] == str(x):
-                print(serverReply['type_received'] + " receipt confirmed by UUID")
+            x = uuid.uuid4()
+            msg = {}
+            msg['uuid'] = str(x)
+            msg['type'] = "sendFrame"
+            msg['sendFrame'] = {}
+            serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
+            if serverReply is not None:
+                print(serverReply['uuid_received'])
+                if serverReply['uuid_received'] == str(x):
+                    print(serverReply['type_received'] + " receipt confirmed by UUID")
         return "nextAction"
     
     @state(name="sendVideo")
@@ -693,7 +723,7 @@ class FlyPawPilot(StateMachine):
         print("flight complete")
         return "completed"
     
-    @scate(name="completed")
+    @state(name="completed")
     async def completed(self, _ ):
         """
         post flight cleanup
@@ -701,7 +731,7 @@ class FlyPawPilot(StateMachine):
         print("cleaning up")
         logState(self.logfiles['state'], "completed")
         x = uuid.uuid4()
-	msg = {}
+        msg = {}
         msg['uuid'] = str(x)
         msg['type'] = "completed"
         serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
@@ -1134,4 +1164,63 @@ def udpFileSend(filename, address, port, buffersz):
     sock.close()
     ifile.close()
     return 0
+
+def prometheusStatusQuery(prometheusURL):
+    response = requests.get(prometheusURL, verify=False, timeout=3)
+    online = False
+    if response.status_code == 200:
+        connected = 1
+        print("status query result: " + response.text)
+        nodestatusJSON = json.loads(response.content)
+        print("status query dump: " + json.dumps(nodestatusJSON))
+    else:
+        connected = 0
+        print("response status: " + str(response.status_code))
+			
+    if connected and nodestatusJSON["status"] is not None and nodestatusJSON["data"] is not None:
+        if (nodestatusJSON["status"] == "success"):
+            querydata = nodestatusJSON["data"]
+            if querydata["result"] is not None:
+                result = querydata["result"]
+                if (result):
+                    value = result[0]["value"]
+                    status = value[1]
+                    if (status == "1"):
+                        print ("node is online")
+                        online = True
+                    else:
+                        print ("node is offline")
+                else:
+                    print ("no results present")
+            else:
+                print ("no results present")
+        else:
+            print ("query failed")
+    else:
+        print ("not connected or null result to query")
+    return online
+
+def prometheusLoadQuery(prometheusURL):
+    response = requests.get(prometheusURL, verify=False, timeout=3)
+    if response.status_code == 200:
+        print ("load query result: " + response.text)
+        nodeloadJSON = json.loads(response.content)
+        print ("load query dump: " + json.dumps(nodeloadJSON))
+        if (nodeloadJSON["status"] == "success") :
+            querydata = nodeloadJSON["data"]
+            result = querydata["result"] 
+            if (result):
+                value = result[0]["value"]
+                load = value[1]
+                print ("load: " + load)
+                return load
+            else:
+                print ("no load results given")
+                return None
+        else:
+            print("node status: " + nodeloadJSON["status"])
+            return None
+    else:
+        print("response status: " + str(response.status_code))
+        return None
 
