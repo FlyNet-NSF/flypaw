@@ -222,7 +222,7 @@ class FlyPawPilot(StateMachine):
         #likely a lot more to check... 
 
         #ok, try to accept mission
-        print("accepting mission... this can take up to 15 minutes to get confirmation while cloud resources are reserved")
+        print("accepting mission... this can take up to 20 minutes to get confirmation while cloud resources are reserved")
         missionAccepted = acceptMission(self.basestationIP, self.missions[0])
         if missionAccepted:
             print (self.missions[0].missionType + " mission accepted")
@@ -1066,8 +1066,8 @@ def acceptMission(basestationIP, thismission):
     msg = {}
     msg['uuid'] = str(x)
     msg['type'] = "acceptMission"
-    #wait up to 15 minutes for cloud resources to be procured after accepting mission
-    serverReply = udpClientMsg(msg, basestationIP, 20001, 900)
+    #wait up to 20 minutes for cloud resources to be procured after accepting mission
+    serverReply = udpClientMsg(msg, basestationIP, 20001, 1200)
     if serverReply is not None:
         print(serverReply['uuid_received'])
         if serverReply['uuid_received'] == str(x):
