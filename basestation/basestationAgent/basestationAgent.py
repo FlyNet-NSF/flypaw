@@ -89,6 +89,27 @@ def getMissionLibraries(mission, resources):
     else:
         return None
 
+def getMissionCompletionCommands(mission, resources):
+    #stub... unfinished
+    thisMission = mission.__dict__
+
+    if 'missionType' in thisMission:
+        missiontype = thisMission['missionType']
+        missionCompletionCommands = [] #one list of commands per resource
+        if missiontype == "bandwidth":
+            for thisResource in resources:
+                thisResourceInfo = thisResource.__dict__
+                #a list of commands for each resource
+                completionCommands = []
+                missionCompletionCommands.append(completionCommands)
+        elif missiontype == "videography":
+            for thisResource in resources:
+                thisResourceInfo = thisResource.__dict__
+                #a list of commands for each resource
+                completionCommands = []
+                missionCompletionCommands.append(completionCommands)
+        return missionCompletionCommands
+
 def getMissionResourcesCommands(mission, resources):
     thisMission = mission.__dict__
     
@@ -505,6 +526,26 @@ class FlyPawBasestationAgent(object):
                 elif msgType == "abortMission":
                     print ("mission abort... prepare for landing")
                 elif msgType == "completed":
+                    #download your log files from the cloud
+                    #missionCompletionCommands = getMissionCompletionCommands(self.missions[0],self.resourceList)
+                    for s in slices:
+                        #nodeno = 0
+                        for node in s.get_nodes():
+                            nodeName = node.get_name()
+                            print("Run Commands for nodeName: " + nodeName)
+                            logTime = datetime.now().astimezone().isoformat()
+                            iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
+                            node.download_file(darknetLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
+                            darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
+                            node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
+                            
+                            #for command in missionResourcesCommands[nodeno]:
+                            #    print("command: " + command)
+                            #    stdout, stderr = node.execute(command)
+		            #    print(stdout)
+                            #    print(stderr)
+                            #nodeno = nodeno + 1
+                    
                     # delete the cloud resources
                     self.cloud_mgr.delete()
                     print("flight complete")
