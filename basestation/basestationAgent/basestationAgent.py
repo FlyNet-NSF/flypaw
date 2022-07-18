@@ -535,7 +535,7 @@ class FlyPawBasestationAgent(object):
                             print("Run Commands for nodeName: " + nodeName)
                             logTime = datetime.now().astimezone().isoformat()
                             iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
-                            node.download_file(darknetLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
+                            node.download_file(iperfLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
                             darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
                             node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
                             
