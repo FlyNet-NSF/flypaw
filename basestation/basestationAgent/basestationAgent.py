@@ -545,9 +545,11 @@ class FlyPawBasestationAgent(object):
 		            #    print(stdout)
                             #    print(stderr)
                             #nodeno = nodeno + 1
-                    
+                            print("Deleting: " + nodeName)
+                            nodeDelete = node.delete()
+
                     # delete the cloud resources
-                    self.cloud_mgr.delete()
+                    #self.cloud_mgr.delete()
                     print("flight complete")
                     sys.exit()
                 else:
