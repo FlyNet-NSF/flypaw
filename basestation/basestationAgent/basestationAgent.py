@@ -438,7 +438,10 @@ class FlyPawBasestationAgent(object):
                     if (fail):
                         msgFromServer['missionstatus'] = "canceled"
                         #delete the cloud resources 
-                        self.cloud_mgr.delete()
+                        for s in slices:
+                            for n in s.get_nodes():
+                                n.delete()
+                        #self.cloud_mgr.delete()
                         return
                         
                     # now configure nodes...
