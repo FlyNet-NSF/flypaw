@@ -621,22 +621,6 @@
                     30
                 ],
                 "type": "SimpleItem"
-            },
-            {
-                "autoContinue": true,
-                "command": 20,
-                "doJumpId": 33,
-                "frame": 2,
-                "params": [
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0,
-                    0
-                ],
-                "type": "SimpleItem"
             }
         ],
         "plannedHomePosition": [
