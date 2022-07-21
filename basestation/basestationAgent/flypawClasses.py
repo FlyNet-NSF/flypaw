@@ -84,6 +84,7 @@ class missionInfo(object):
         self.priority = float #normalized float from 0-1
         self.planfile = str #path to planfile optional 
         self.name = str #the name of the mission
+        self.resources = bool #true-> outside resources/edge devices false-> just drone and basestation
         
 class resourceInfo(object):
     def __init__(self):
