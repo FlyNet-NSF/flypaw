@@ -245,17 +245,21 @@ class FlyPawBasestationAgent(object):
         #for mission data, we should probably be checking elsewhere... for now we'll just define a mission here:
         mission = missionInfo()
         mission.name = "AERPAW"
-        mission.missionType = "videography" #'bandwidth', "videography"
-        mission.missionLeader = "drone" #or basestation or cloud
+        mission.missionType = "fire" #"bandwidth", "videography", "fire"
+        mission.missionLeader = "basestation" #drone or basestation or cloud
         mission.priority = 1
         mission.planfile = "./plans/mission.plan"
         mission.default_waypoints = []
         plan = getPlanFromPlanfile(mission.planfile)
         processedPlan = processPlan(plan)
         mission.default_waypoints = processedPlan['default_waypoints']
+        mission.resources = False
         self.missions.append(mission)
-        self.cloud_mgr = Controller(config_file_location="./config.yml")
-
+        if mission.resources:
+            self.cloud_mgr = Controller(config_file_location="./config.yml")
+        else:
+            self.cloud_mgr = None
+            
     def update_digital_twin(self):
         """
         function call to update the digital twin with different types of incoming data   
@@ -282,12 +286,55 @@ class FlyPawBasestationAgent(object):
                 self.droneSim.home = msg['telemetry']['home']
             if msg['telemetry']['nextWaypoint'] is not None:
                 self.droneSim.nextWaypoint = msg['telemetry']['nextWaypoint']
+
+        if self.missions[0].resources:
+            #only do this if we have an outside connection
+            #self.update_digital_twin(msg)
+            acsUpdate = self.update_acs()
+            print(acsUpdate)
             
-        #self.update_digital_twin(msg)
-        acsUpdate = self.update_acs()
-        print(acsUpdate)
         return
 
+    def register_acs(self):
+        #register in ACS  (once it's working move it down below the get resources
+        """                                                                      
+        ACS registration                                                                                                                                                    
+        """
+        print("register in ACS")
+        
+        lineString = gj.LineString(self.missions[0].default_waypoints)
+        userProperties = {}
+        featureList = []
+        userProperties['classification'] = "scheduledFlight";
+        eventName = self.missions[0].name
+        #utcnow = datetime.utcnow()                                                                                                                                         
+        #startTime = utcnow.isoformat(sep='T')                                                                                                                              
+        currentUnixsecs = datetime.now(tz=pytz.UTC).timestamp()
+        laterUnixsecs = currentUnixsecs + 1800 #half an hour from now                                                                                                       
+        currentDT = datetime.fromtimestamp(currentUnixsecs, tz=pytz.UTC)
+        laterDT = datetime.fromtimestamp(laterUnixsecs, tz=pytz.UTC)
+        startTime = currentDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        endTime = laterDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        
+        feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
+        featureList.append(feature)
+        fc = gj.FeatureCollection(featureList)
+        dumpFC = gj.dumps(fc, sort_keys=True)
+        FC_data = {'json': dumpFC}
+        flightsubmitresp = requests.post(self.acs, auth=(self.usrname, self.password), data=FC_data)
+        registerResp = {}
+        registerResp['registrationStatusCode'] = flightsubmitresp.status_code
+        print(flightsubmitresp.status_code)
+        if flightsubmitresp.status_code == 200:
+            registerResp['registration'] = "OK"
+            print(json.dumps(registerResp))
+            return True
+        else:
+            print("could not register flight in ACS")
+            registerResp['registration'] = "FAILED"
+            print(json.dumps(registerResp))
+            return False
+        
     def update_acs(self):
         postData = {}
         postData['type'] = 'Feature'
@@ -372,124 +419,100 @@ class FlyPawBasestationAgent(object):
                     msgFromServer['missions'] = self.missions
                     
                 elif msgType == "acceptMission":
-
-                    #register in ACS  (once it's working move it down below the get resources
+                    #if you have an outside connection only
+                    if self.missions[0].resources:
+                        #register in ACS  (once it's working move it down below the get resources
+                        
+                        """
+                        ACS registration
+                        """
+                        registered = self.register_acs()
+                        if not registered:
+                            msgFromServer['missionstatus'] = "canceled"
+                            return
                     
-                    """
-                    ACS registration
-                    """
-                    print("register in ACS")
-                    
-                    lineString = gj.LineString(self.missions[0].default_waypoints)
-                    userProperties = {}
-                    featureList = []
-                    userProperties['classification'] = "scheduledFlight";
-                    eventName = self.missions[0].name
-                    #utcnow = datetime.utcnow()
-                    #startTime = utcnow.isoformat(sep='T')
-                    currentUnixsecs = datetime.now(tz=pytz.UTC).timestamp()
-                    laterUnixsecs = currentUnixsecs + 1800 #half an hour from now
-                    currentDT = datetime.fromtimestamp(currentUnixsecs, tz=pytz.UTC)
-                    laterDT = datetime.fromtimestamp(laterUnixsecs, tz=pytz.UTC)
-                    startTime = currentDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-                    endTime = laterDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-
-                    feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
-                    featureList.append(feature)
-                    fc = gj.FeatureCollection(featureList)
-                    dumpFC = gj.dumps(fc, sort_keys=True)
-                    FC_data = {'json': dumpFC}
-                    flightsubmitresp = requests.post(self.acs, auth=(self.usrname, self.password), data=FC_data)
-                    registerResp = {}
-                    registerResp['registrationStatusCode'] = flightsubmitresp.status_code
-                    print(flightsubmitresp.status_code)
-                    if flightsubmitresp.status_code == 200:
-                        registerResp['registration'] = "OK"
-                    else:
-                        print("could not register flight in ACS")
-                        registerResp['registration'] = "FAILED"
-                        print(json.dumps(registerResp))
-                        msgFromServer['missionstatus'] = "canceled"
-                        return
-
-                    #if we're registered properly...
-                    #get cloud resources and configure to mission
-                    self.cloud_mgr.create()
-                    time.sleep(3)
-                    slices = self.cloud_mgr.get_resources()
-                    for s in slices:
-                        for n in s.get_nodes():
-                            thisResourceInfo = resourceInfo()
-                            thisResourceInfo.name = n.get_name()
-                            thisResourceInfo.location = "KVM@TACC" #extract algorithmically
-                            thisResourceInfo.purpose = "mission" #get from mission somehow
+                        #if we're registered properly...
+                        #get cloud resources and configure to mission
+                        self.cloud_mgr.create()
+                        time.sleep(3)
+                        slices = self.cloud_mgr.get_resources()
+                        for s in slices:
+                            for n in s.get_nodes():
+                                thisResourceInfo = resourceInfo()
+                                thisResourceInfo.name = n.get_name()
+                                thisResourceInfo.location = "KVM@TACC" #extract algorithmically
+                                thisResourceInfo.purpose = "mission" #get from mission somehow
                             
-                            m_ip = ("management", n.get_management_ip())
-                            e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
-                            thisResourceInfo.resourceAddresses.append(m_ip)
-                            thisResourceInfo.resourceAddresses.append(e_ip)
-                            thisResourceInfo.state = n.get_reservation_state()
-                            self.resourceList.append(thisResourceInfo)
-                    print("giving resources 60 seconds to come online")
-                    time.sleep(60)
+                                m_ip = ("management", n.get_management_ip())
+                                e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
+                                thisResourceInfo.resourceAddresses.append(m_ip)
+                                thisResourceInfo.resourceAddresses.append(e_ip)
+                                thisResourceInfo.state = n.get_reservation_state()
+                                self.resourceList.append(thisResourceInfo)
+                        print("giving resources 60 seconds to come online")
+                        time.sleep(60)
 
                     # Now that you have the IP addresses, configure anything on the basestation
                     fail = configureBasestationProcesses(self.missions[0],self.resourceList)
                     if (fail):
                         msgFromServer['missionstatus'] = "canceled"
-                        #delete the cloud resources 
+
+                        if self.missions[0].resources:
+                            #delete the cloud resources 
+                            for s in slices:
+                                for n in s.get_nodes():
+                                    n.delete()
+                            #self.cloud_mgr.delete()
+                            return
+                    
+                    if self.missions[0].resources:
+                        # now configure nodes...
+                        """
+                        Mission Library Installation on Cloud Nodes
+                        """
+                        missionLibraries = getMissionLibraries(self.missions[0], self.resourceList)
+
                         for s in slices:
-                            for n in s.get_nodes():
-                                n.delete()
-                        #self.cloud_mgr.delete()
-                        return
-                        
-                    # now configure nodes...
-                    """
-                    Mission Library Installation on Cloud Nodes
-                    """
-                    missionLibraries = getMissionLibraries(self.missions[0], self.resourceList)
+                            nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Install Libraries for nodeName: " + nodeName)
+                                #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
+                                #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
+                                #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
+                                #stdout, stderr = node.execute(getRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                #stdout, stderr = node.execute(installRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                #stdout, stderr = node.execute(swapRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                for library in missionLibraries[nodeno]:
+                                    #libraryInstallStr = "sudo dnf -y install " + library #centos8 
+                                    libraryInstallStr = "sudo yum -y install " + library #centos7
+                                    print(nodeName + ": " + libraryInstallStr)
+                                    stdout, stderr = node.execute(libraryInstallStr)
+                                    print(stdout)
+                                    print(stderr)
+                                nodeno = nodeno + 1
 
-                    for s in slices:
-                        nodeno = 0
-                        for node in s.get_nodes():
-                            nodeName = node.get_name()
-                            print("Install Libraries for nodeName: " + nodeName)
-                            #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
-                            #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
-                            #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
-                            #stdout, stderr = node.execute(getRepoStr)
-                            #print(stdout)
-                            #print(stderr)
-                            #stdout, stderr = node.execute(installRepoStr)
-                            #print(stdout)
-                            #print(stderr)
-                            #stdout, stderr = node.execute(swapRepoStr)
-                            #print(stdout)
-                            #print(stderr)
-                            for library in missionLibraries[nodeno]:
-                                #libraryInstallStr = "sudo dnf -y install " + library #centos8 
-                                libraryInstallStr = "sudo yum -y install " + library #centos7
-                                print(nodeName + ": " + libraryInstallStr)
-                                stdout, stderr = node.execute(libraryInstallStr)
-                                print(stdout)
-                                print(stderr)
-                            nodeno = nodeno + 1
+                        #now install and run any preflight commands/configuration on the nodes
+                        # ideally this would be coordinated be done through KubeCtl or something
+                        missionResourcesCommands = getMissionResourcesCommands(self.missions[0],self.resourceList)
+                        for s in slices:
+                            nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Run Commands for nodeName: " + nodeName)
+                                for command in missionResourcesCommands[nodeno]:
+                                    print("command: " + command)
+                                    stdout, stderr = node.execute(command)
+                                    print(stdout)
+                                    print(stderr)
+                                nodeno = nodeno + 1
 
-                    #now install and run any preflight commands/configuration on the nodes
-                    # ideally this would be coordinated be done through KubeCtl or something
-                    missionResourcesCommands = getMissionResourcesCommands(self.missions[0],self.resourceList)
-                    for s in slices:
-                        nodeno = 0
-                        for node in s.get_nodes():
-                            nodeName = node.get_name()
-                            print("Run Commands for nodeName: " + nodeName)
-                            for command in missionResourcesCommands[nodeno]:
-                                print("command: " + command)
-                                stdout, stderr = node.execute(command)
-                                print(stdout)
-                                print(stderr)
-                            nodeno = nodeno + 1
                     msgFromServer['missionstatus'] = "confirmed"
                     
                 elif msgType == "resourceInfo":
@@ -531,28 +554,29 @@ class FlyPawBasestationAgent(object):
                 elif msgType == "completed":
                     #download your log files from the cloud
                     #missionCompletionCommands = getMissionCompletionCommands(self.missions[0],self.resourceList)
-                    for s in slices:
-                        #nodeno = 0
-                        for node in s.get_nodes():
-                            nodeName = node.get_name()
-                            print("Run Commands for nodeName: " + nodeName)
-                            logTime = datetime.now().astimezone().isoformat()
-                            iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
-                            node.download_file(iperfLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
-                            darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
-                            node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
+                    if self.missions[0].resources:
+                        for s in slices:
+                            #nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Run Commands for nodeName: " + nodeName)
+                                logTime = datetime.now().astimezone().isoformat()
+                                iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
+                                node.download_file(iperfLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
+                                darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
+                                node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
                             
-                            #for command in missionResourcesCommands[nodeno]:
-                            #    print("command: " + command)
-                            #    stdout, stderr = node.execute(command)
-		            #    print(stdout)
-                            #    print(stderr)
-                            #nodeno = nodeno + 1
-                            print("Deleting: " + nodeName)
-                            nodeDelete = node.delete()
+                                #for command in missionResourcesCommands[nodeno]:
+                                #    print("command: " + command)
+                                #    stdout, stderr = node.execute(command)
+		                #    print(stdout)
+                                #    print(stderr)
+                                #nodeno = nodeno + 1
+                                print("Deleting: " + nodeName)
+                                nodeDelete = node.delete()
 
-                    # delete the cloud resources
-                    #self.cloud_mgr.delete()
+                                # delete the cloud resources
+                                #self.cloud_mgr.delete()
                     print("flight complete")
                     sys.exit()
                 else:
