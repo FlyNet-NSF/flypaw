@@ -73,9 +73,7 @@ class FlyPawPilot(StateMachine):
         #errors
         error_file_name = output_directory + "error_%s.txt" % (current_timestring)
         self.logfiles['error'] = error_file_name
-        
-        #"waypoint_entry" #default
-        
+                
     #@entrypoint
     @state(name="preflight", first=True)
     async def preflight(self, drone=Drone):
@@ -258,15 +256,7 @@ class FlyPawPilot(StateMachine):
             else:
                 print("no external IP address found for node: " + resource.name)
 
-        """
-        Mission Specific Update Now that we have resource IP addresses
-        """
-        self.videoURL = "udp://" + externalIP + ":23000"
-        
-        
-        #configureResources should block up to 5 minutes while configuring 
-        #configureResources(missionLibraries, self.resources[0])
-        
+                        
         """
         keep track of previous states, starting now
         """
@@ -389,9 +379,17 @@ class FlyPawPilot(StateMachine):
             print("no reply from server while transmitting position")
        
         #check for mission actions to be performed at the start of this state
-        self.nextStates = getEntryMissionActions(self.missions[0].missionType)
+        #if the drone is the mission leader, or there's no comms to the basestation
+        if not self.communications['reportPositionUDP'] or self.missions[0].missionLeader == "drone":
+            self.nextStates = getEntryMissionActions(self.missions[0].missionType)
 
-        #move onto the next pending task or default task
+        else:
+            #if you have comms and the basestation is the leader, ask what to do
+            self.nextStates = self.instructionRequest()
+            #if you don't have any instructions figure it out for yourself
+            if not self.nextStates:
+                self.nextStates = getEntryMissionActions(self.missions[0].missionType)
+
         return "nextAction"
         
         
@@ -455,11 +453,10 @@ class FlyPawPilot(StateMachine):
         #you've arrived at your next waypoint
         return "waypoint_entry" 
 
-    @state(name="instructionRequest")
-    async def instructionRequest(self, drone: Drone):
+    def instructionRequest(self, drone: Drone):
         logState(self.logfiles['state'], "instructionRequest")
-        defaultSequence = "flight"
-        nextSequence = defaultSequence
+        #defaultSequence = "flight"
+        #nextSequence = defaultSequence
         x = uuid.uuid4()
         msg = {}
         msg['uuid'] = str(x)
@@ -474,26 +471,28 @@ class FlyPawPilot(StateMachine):
                     print(theseRequests)
                     #just handle the first request for now
                     if serverReply['requests'] is not None:
-                        thisPrimaryRequest = theseRequests[0]
-                        if 'command' in thisPrimaryRequest:
-                            requestIsValid = validateRequest(thisPrimaryRequest['command'])
-                            if requestIsValid:
-                                print("performing request: " + thisPrimaryRequest['command'])
-                                nextSequence = thisPrimaryRequest['command']
-                            else:
-                                print("request not valid.  Going to default action: " + nextSequence)
+                        return theseRequests
+                        #thisPrimaryRequest = theseRequests[0]
+                        #if 'command' in thisPrimaryRequest:
+                        #    requestIsValid = validateRequest(thisPrimaryRequest['command'])
+                        #    if requestIsValid:
+                        #        print("performing request: " + thisPrimaryRequest['command'])
+                        #        nextSequence = thisPrimaryRequest['command']
+                        #    else:
+                        #        print("request not valid.  Going to default action: " + nextSequence)
 
-                        else:
-                            print("command not present in this request.  Going to default action: " + nextSequence)
+                        #else:
+                        #    print("command not present in this request.  Going to default action: " + nextSequence)
                     else:
-                        print("no requests at the moment. Going to default action: " + nextSequence)
+                        print("no requests at the moment. Drone to decide")
                 else:
-                    print("requests not present in server reply. Going to default action: " + nextSequence)
+                    print("requests not present in server reply. Drone to decide")
             else:
-                print ("uuid mismatched.  Going to default action: " + nextSequence)
+                print ("uuid mismatched.  Drone to decide")
         else:
-            print("No reply from server.  Going to default action: " + nextSequence)
-        
+            print("No reply from server.  Drone to decide")
+            
+        return None
         #if for any reason you asked for a request and didn't get one or got a bad one, we're on our own for now
         #implement safety checks
         #check how far we are from the home location
@@ -825,6 +824,44 @@ class FlyPawPilot(StateMachine):
                 print("we have a mismatch in uuids... investigate")
                 return 0
         return 0
+
+    def instructionRequest(self, drone: Drone):
+        logState(self.logfiles['state'], "instructionRequest") #no longer a state, but still log it
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "instructionRequest"
+        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
+        if serverReply is not None:
+            print(serverReply['uuid_received'])
+            if serverReply['uuid_received'] == str(x):
+                print(serverReply['type_received'] + " receipt confirmed by UUID")
+                if 'requests' in serverReply:
+                    theseRequests = serverReply['requests']
+                    print(theseRequests)
+                    if serverReply['requests'] is not None:
+                        return theseRequests
+                        #thisPrimaryRequest = theseRequests[0] 
+                        #if 'command' in thisPrimaryRequest:
+                        #    requestIsValid = validateRequest(thisPrimaryRequest['command'])
+                        #    if requestIsValid:
+                        #        print("performing request: " + thisPrimaryRequest['command'])
+                        #        nextSequence = thisPrimaryRequest['command']
+                        #    else:
+                        #        print("request not valid.  Going to default action: " + nextSequence)
+                        
+                        #else:
+                        #    print("command not present in this request.  Going to default action: " + nextSequence)
+                    else:
+                        print("no requests at the moment. Drone to decide")
+                else:
+                    print("requests not present in server reply. Drone to decide")
+            else:
+                print ("uuid mismatched.  Drone to decide")
+        else:
+            print("No reply from server.  Drone to decide")
+
+        return None
     
 def getMissions(basestationIP):
     x = uuid.uuid4()
@@ -1091,6 +1128,9 @@ def getEntryMissionActions(missiontype):
         mission_actions.append('iperf')
         mission_actions.append('sendFrame')
         #mission_actions.append('sendVideo')
+    elif missiontype == "fire":
+        mission_actions.append('iperf')
+        mission_actions.append('sendFrame')
     return mission_actions
 
 def logState(logfile, state):
