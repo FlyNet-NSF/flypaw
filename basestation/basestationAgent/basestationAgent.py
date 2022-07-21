@@ -65,6 +65,13 @@ def configureBasestationProcesses(mission, resources):
             prometheusFail = configurePrometheusForResources(resources)
             if (prometheusFail):
                 return 1
+        elif missiontype == "bandwidth":
+            #could theoretically start iperf server, but punt for now
+            return 1
+        elif missiontype == "fire":
+            #maybe start the udp video frame transfer server?
+            #could theoretically start iperf server
+            return 1
     return 0
 
                 
