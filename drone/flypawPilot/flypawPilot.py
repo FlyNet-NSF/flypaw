@@ -41,6 +41,7 @@ class FlyPawPilot(StateMachine):
         self.missionstate = None
         self.currentIperfObjArr = []
         self.communications = {}
+        self.radio = {}
         self.resources = []
         self.currentWaypointIndex = 0
         self.nextStates = []
@@ -52,6 +53,10 @@ class FlyPawPilot(StateMachine):
         self.prometheusQueryURL = "http://" + self.basestationIP + ":9090/api/v1/query?query=" 
         #frame can be used for sendVideo or sendFrame depending on mission type
         self.frame = 1
+
+        #eNB location
+        self.radio['lat'] = 35.72744
+        self.radio['lon'] = -78.69607
         
         now = datetime.now()
         current_timestring = now.strftime("%Y%m%d-%H%M%S")
@@ -519,63 +524,18 @@ class FlyPawPilot(StateMachine):
                 if (address[0] == "external"):
                     externalIP = address[1]
             if externalIP is not None:
-                x = uuid.uuid4()
-                msg = {}
-                msg['uuid'] = str(x)
-                msg['type'] = "iperfResults"
-                msg['iperfResults'] = {}
-                client = iperf3.Client()
-                client.server_hostname = externalIP
-                #client.server_hostname = self.basestationIP
-                client.port = 5201
-                client.duration = 3
-                client.json_output = True
-                result = client.run()
-                err = result.error
-                iperfPosition = getCurrentPosition(drone)
-                msg['iperfResults']['ipaddr'] = client.server_hostname
-                msg['iperfResults']['port'] = client.port
-                msg['iperfResults']['protocol'] = "tcp" #static for now
-                msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
-                if err is not None:
-                    msg['iperfResults']['connection'] = err
-                    msg['iperfResults']['mbps'] = None
-                    msg['iperfResults']['retransmits'] = None
-                    msg['iperfResults']['meanrtt'] = None
-                    thistime = datetime.now()
-                    unixsecs = datetime.timestamp(thistime)
-                    msg['iperfResults']['unixsecs'] = int(unixsecs)
-                else:
-                    datarate = result.sent_Mbps
-                    retransmits = result.retransmits
-                    unixsecs = result.timesecs
-                    result_json = result.json
-                    meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
-                    msg['iperfResults']['connection'] = 'ok'
-                    msg['iperfResults']['mbps'] = datarate
-                    msg['iperfResults']['retransmits'] = retransmits
-                    msg['iperfResults']['unixsecs'] = unixsecs
-                    msg['iperfResults']['meanrtt'] = meanrtt
-                    
-                    result_str = json.dumps(msg)
-                    with open(self.logfiles['iperf'], "a") as ofile:
-                        ofile.write(result_str + "\n")
-                        ofile.close()
-                    iperfObjArr.append(msg['iperfResults'])
-                    serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
-                    if serverReply is not None:
-                        print(serverReply['uuid_received'])
-                        if serverReply['uuid_received'] == str(x):
-                            print(serverReply['type_received'] + " receipt confirmed by UUID")
-                            self.communications['iperf'] = 1
-                        else:
-                            print(serverReply['type_received'] + " does not match our message UUID")
-                            self.communications['iperf'] = 0
-                    else:
-                        print("no reply from server while transmitting iperfResults")
-                        self.communications['iperf'] = 0
-                #delete the iperf3 client to avoid errors
-                del client
+                iperfResult = self.runIperf(externalIP)
+                iperfObjArr.append(iperfResult['iperfResults'])
+
+        #once in your current orientation
+        iperfResult = self.runIperf(self.basestationIP)
+        iperfObjArr.append(iperfResult['iperfResults'])
+
+        #now yaw toward the radio and do it again
+        geodesic_azi = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.radio.lat, self.radio.lon, 512)
+        bearing_to_radio = geodesic_azi.get('azi1') 
+        drone.set_heading(bearing_to_radio)
+        
         #at the end append all the individual iperf results to the self array
         self.currentIperfObjArr.append(iperfObjArr)
         return "nextAction"
@@ -764,6 +724,66 @@ class FlyPawPilot(StateMachine):
         #if drone is the missionLeader, return flight
         return "flight"
     
+    async def runIperf(self, ipaddr):
+        x = uuid.uuid4()
+        msg = {}
+        msg['uuid'] = str(x)
+        msg['type'] = "iperfResults"
+        msg['iperfResults'] = {}
+        client = iperf3.Client()
+
+        client.server_hostname = ipaddr
+        client.port = 5201
+        client.duration = 3
+        client.json_output = True
+        result = client.run()
+        err = result.error
+        iperfPosition = getCurrentPosition(drone)
+
+        msg['iperfResults']['ipaddr'] = client.server_hostname
+        msg['iperfResults']['port'] = client.port
+        msg['iperfResults']['protocol'] = "tcp"
+        msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+        if err is not None:
+            msg['iperfResults']['connection'] = err
+            msg['iperfResults']['mbps'] = None
+            msg['iperfResults']['retransmits'] = None
+            msg['iperfResults']['meanrtt'] = None
+            thistime = datetime.now()
+            unixsecs = datetime.timestamp(thistime)
+            msg['iperfResults']['unixsecs'] = int(unixsecs)
+        else:
+            datarate = result.sent_Mbps
+            retransmits = result.retransmits
+            unixsecs = result.timesecs
+            result_json = result.json
+            meanrtt = result_json['end']['streams'][0]['sender']['mean_rtt']
+            msg['iperfResults']['connection'] = 'ok'
+            msg['iperfResults']['mbps'] = datarate
+            msg['iperfResults']['retransmits'] = retransmits
+            msg['iperfResults']['unixsecs'] = unixsecs
+            msg['iperfResults']['meanrtt'] = meanrtt
+            
+        result_str = json.dumps(msg)
+        with open(self.logfiles['iperf'], "a") as ofile:
+            ofile.write(result_str + "\n")
+            ofile.close()
+            serverReply = udpClientMsg(msg, self.basestationIP, 20001, 2)
+            if serverReply is not None:
+                print(serverReply['uuid_received'])
+                if serverReply['uuid_received'] == str(x):
+                    print(serverReply['type_received'] + " receipt confirmed by UUID")
+                    self.communications['iperf'] = 1
+                else:
+                    print(serverReply['type_received'] + " does not match our message UUID")
+                    self.communications['iperf'] = 0
+            else:
+                print("no reply from server while transmitting iperfResults")
+                self.communications['iperf'] = 0
+        #delete the iperf3 client to avoid errors
+        del client
+        return msg
+        
     async def reportPositionUDP(self):
         print (str(self.currentPosition.lat) + " " + str(self.currentPosition.lon) + " " + str(self.currentPosition.alt) + " " + str(self.currentPosition.time))
     
