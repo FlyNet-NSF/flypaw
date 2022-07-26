@@ -513,7 +513,7 @@ class FlyPawPilot(StateMachine):
         return nextSequence
         
         
-    @timed_state(name="iperf",duration = 15)
+    @timed_state(name="iperf",duration = 20)
     async def iperf(self, drone: Drone):
         logState(self.logfiles['state'], "iperf")
         iperfObjArr = []
@@ -535,6 +535,9 @@ class FlyPawPilot(StateMachine):
         geodesic_azi = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.radio.lat, self.radio.lon, 512)
         bearing_to_radio = geodesic_azi.get('azi1') 
         drone.set_heading(bearing_to_radio)
+        #now toward the radio                                                                                                                
+        iperfResult = self.runIperf(self.basestationIP)
+        iperfObjArr.append(iperfResult['iperfResults'])
         
         #at the end append all the individual iperf results to the self array
         self.currentIperfObjArr.append(iperfObjArr)
@@ -744,6 +747,7 @@ class FlyPawPilot(StateMachine):
         msg['iperfResults']['port'] = client.port
         msg['iperfResults']['protocol'] = "tcp"
         msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+        msg['iperfResults']['heading'] = [ self.currentHeading ]
         if err is not None:
             msg['iperfResults']['connection'] = err
             msg['iperfResults']['mbps'] = None
