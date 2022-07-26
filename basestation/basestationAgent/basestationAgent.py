@@ -299,6 +299,11 @@ class FlyPawBasestationAgent(object):
             #self.update_digital_twin(msg)
             acsUpdate = self.update_acs()
             print(acsUpdate)
+
+        #set command based on mission                                                                                                                                          
+        if self.missions[0].missionType == "Bandwidth":
+            print("received telemetry, asking for iperf")
+            self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
             
         return
 
@@ -529,10 +534,6 @@ class FlyPawBasestationAgent(object):
                     #update your digital twin, update registry, pass on to downstream applications
                     self.handle_telemetry(clientMessage)
                     
-                    #set command based on mission
-                    print("received telemetry, asking for iperf")
-                    self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default            
-
                 elif msgType == "instructionRequest":
                     msgFromServer['requests'] = self.currentRequests
                     self.currentRequests = []
