@@ -390,9 +390,11 @@ class FlyPawPilot(StateMachine):
 
         else:
             #if you have comms and the basestation is the leader, ask what to do
-            self.nextStates = self.instructionRequest()
+            print("asking what to do")
+            self.nextStates = await self.instructionRequest()
             #if you don't have any instructions figure it out for yourself
             if not self.nextStates:
+                print("no answer... we're on our own")
                 self.nextStates = getEntryMissionActions(self.missions[0].missionType)
 
         return "nextAction"
@@ -458,7 +460,8 @@ class FlyPawPilot(StateMachine):
         #you've arrived at your next waypoint
         return "waypoint_entry" 
 
-    def instructionRequest(self, drone: Drone):
+    @timed_state(name="instructionRequest", duration=1)
+    async def instructionRequest(self):
         logState(self.logfiles['state'], "instructionRequest")
         #defaultSequence = "flight"
         #nextSequence = defaultSequence
@@ -498,24 +501,16 @@ class FlyPawPilot(StateMachine):
             print("No reply from server.  Drone to decide")
             
         return None
-        #if for any reason you asked for a request and didn't get one or got a bad one, we're on our own for now
-        #implement safety checks
-        #check how far we are from the home location
-        #implement me
-        #estimate how much battery it will take to get there
-        #implement me
-        #reqBatteryToGetHome = 30
-        #if currentBattery['level'] < reqBatteryToGetHome:
-        #look for new home within range... if none available, head toward home and prepare for crash landing
-        #elif currentBattery['level'] >= reqBatteryToGetHome and currentBattery['level'] < reqBatteryToGetHome + 10:
-        #look for new home or go home
-        
-        return nextSequence
-        
-        
-    @timed_state(name="iperf",duration = 15)
+                
+    @timed_state(name="iperf",duration = 20)
     async def iperf(self, drone: Drone):
+        print("iperf state")
         logState(self.logfiles['state'], "iperf")
+
+        params = self.nextStates[0]['parameters']
+        print("params: " + json.dumps(params))
+        #pop this state
+        self.nextStates.pop(0)
         iperfObjArr = []
         for resource in self.resources:
             externalIP = None
@@ -524,75 +519,96 @@ class FlyPawPilot(StateMachine):
                 if (address[0] == "external"):
                     externalIP = address[1]
             if externalIP is not None:
-                iperfResult = self.runIperf(externalIP)
+                iperfResult = await self.runIperf(externalIP, drone)
                 iperfObjArr.append(iperfResult['iperfResults'])
-
-        #once in your current orientation
-        iperfResult = self.runIperf(self.basestationIP)
+        
+        #run it once in your current orientation
+        iperfResult = await self.runIperf(self.basestationIP, drone)
+        print("iperf result finished")
+        print(iperfResult['iperfResults'])
         iperfObjArr.append(iperfResult['iperfResults'])
 
         #now yaw toward the radio and do it again
-        geodesic_azi = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.radio.lat, self.radio.lon, 512)
-        bearing_to_radio = geodesic_azi.get('azi1') 
-        drone.set_heading(bearing_to_radio)
+        geodesic_azi = Geodesic.WGS84.Inverse(self.currentPosition.lat, self.currentPosition.lon, self.radio['lat'], self.radio['lon'], 512)
+        bearing_to_radio = geodesic_azi.get('azi1')
+        print("set bearing to " + str(bearing_to_radio))
+        await drone.set_heading(bearing_to_radio)
+        print("bearing set, now run iperf again")
+        #now toward the radio                                                                                                                
+        iperfResult = await self.runIperf(self.basestationIP, drone)
+        print("second iperf result finished")
+        print(iperfResult['iperfResults'])
+        iperfObjArr.append(iperfResult['iperfResults'])
         
         #at the end append all the individual iperf results to the self array
         self.currentIperfObjArr.append(iperfObjArr)
+        
         return "nextAction"
 
     @state(name="sendFrame")
     async def sendFrame(self, _ ):
         logState(self.logfiles['state'], "sendFrame")
+        print("sendFrame state")
+        
+        params = self.nextStates[0]['parameters']
+        print("params: " + json.dumps(params))
+        self.nextStates.pop(0)
+        
         if (self.frame > 1401): #only because the test data has like 1450 frames
             self.frame = 1
+
         framestr = str(self.frame).zfill(7) + ".jpg"
         framefn = self.frameLocation + "/" + framestr
-        
+
+        #move the below elsewhere
         #figure out where to send
         #i) check prometheus
-        up_array = []
-        load_array = []
-        for resource in self.resources:
-            externalIP = None
-            for address in resource.resourceAddresses:
-                print("address type: " + address[0])
-                if (address[0] == "external"):
-                    externalIP = address[1]
-                    statusQueryURL = self.prometheusQueryURL + 'up{instance="' + externalIP + ':8095"}'
-                    print("status query: " + statusQueryURL)
-                    nodeOnline = prometheusStatusQuery(statusQueryURL)
-                    nodeOnlineObj = {}
-                    nodeOnlineObj['externalIP'] = externalIP
-                    nodeOnlineObj['online'] = nodeOnline
-                    if nodeOnlineObj not in up_array:
-                        up_array.append(nodeOnlineObj)
-                    if nodeOnline:
-                        loadQueryURL = self.prometheusQueryURL + 'node_load1{instance="' + externalIP + ':8095"}'
-                        print("load query: " + loadQueryURL)
-                        loadResult = prometheusLoadQuery(loadQueryURL)
-                        loadObj = {}
-                        if loadResult is not None:
-                            loadObj['externalIP'] = externalIP
-                            loadObj['load'] = loadResult
-                            load_array.append(loadObj)
+        #up_array = []
+        #load_array = []
+        #for resource in self.resources:
+        #    externalIP = None
+        #    for address in resource.resourceAddresses:
+        #        print("address type: " + address[0])
+        #        if (address[0] == "external"):
+        #            externalIP = address[1]
+        #            statusQueryURL = self.prometheusQueryURL + 'up{instance="' + externalIP + ':8095"}'
+        #            print("status query: " + statusQueryURL)
+        #            nodeOnline = prometheusStatusQuery(statusQueryURL)
+        #            nodeOnlineObj = {}
+        #            nodeOnlineObj['externalIP'] = externalIP
+        #            nodeOnlineObj['online'] = nodeOnline
+        #            if nodeOnlineObj not in up_array:
+        #                up_array.append(nodeOnlineObj)
+        #            if nodeOnline:
+        #                loadQueryURL = self.prometheusQueryURL + 'node_load1{instance="' + externalIP + ':8095"}'
+        #                print("load query: " + loadQueryURL)
+        #                loadResult = prometheusLoadQuery(loadQueryURL)
+        #                loadObj = {}
+        #                if loadResult is not None:
+        #                    loadObj['externalIP'] = externalIP
+        #                    loadObj['load'] = loadResult
+        #                    load_array.append(loadObj)
 
-        minload = 100.1
-        bestnode = None
-        for onlineNode in load_array:
-            load = float(onlineNode['load'])
-            print("node: " + onlineNode['externalIP'])
-            print("load: " + str(load))
-            if load < minload:
-                bestnode = onlineNode['externalIP']
-                minload = load
-        if bestnode is not None:
-            print("send to: " + bestnode)
+        #minload = 100.1
+        #bestnode = None
+        #for onlineNode in load_array:
+        #    load = float(onlineNode['load'])
+        #    print("node: " + onlineNode['externalIP'])
+        #    print("load: " + str(load))
+        #    if load < minload:
+        #        bestnode = onlineNode['externalIP']
+        #        minload = load
+        #if bestnode is not None:
+        #    print("send to: " + bestnode)
                     
-            fileSendFail = udpFileSend(framefn, bestnode, 8096, 1024) #try 1024 for buffer size for now
-            if fileSendFail:
-                print("couldn't send video")
-            else:
-                self.frame = self.frame + 50
+        #    fileSendFail = udpFileSend(framefn, bestnode, 8096, 1024) #try 1024 for buffer size for now
+
+        fileSendFail = udpFileSend(framefn, params['ipaddr'], params['port'], params['chunksize'])
+        if fileSendFail:
+            print("couldn't send video")
+        else:
+            print("successfully sent frames")
+            self.frame = self.frame + 50
             
             x = uuid.uuid4()
             msg = {}
@@ -604,6 +620,7 @@ class FlyPawPilot(StateMachine):
                 print(serverReply['uuid_received'])
                 if serverReply['uuid_received'] == str(x):
                     print(serverReply['type_received'] + " receipt confirmed by UUID")
+
         return "nextAction"
     
     @state(name="sendVideo")
@@ -635,6 +652,10 @@ class FlyPawPilot(StateMachine):
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
                 print(serverReply['type_received'] + " receipt confirmed by UUID")
+
+        #pop this state
+        self.nextStates.pop(0)
+                
         return "nextAction"
 
         
@@ -651,6 +672,10 @@ class FlyPawPilot(StateMachine):
             print(serverReply['uuid_received'])
             if serverReply['uuid_received'] == str(x):
                 print(serverReply['type_received'] + " receipt confirmed by UUID")
+
+        #pop this state
+        self.nextStates.pop(0)
+                
         return "nextAction"
 
     @state(name="abortMission")
@@ -706,13 +731,20 @@ class FlyPawPilot(StateMachine):
         #check to see if we have anything else pending to do                                                                                                                         
         logState(self.logfiles['state'], "nextAction")
         if self.nextStates:
+            print("we have states pending")
+            for st in self.nextStates:
+                print(json.dumps(st))
+                
             while self.nextStates:
-                reqIsValid = validateRequest(self.nextStates[0])
+                reqIsValid = validateRequest(self.nextStates[0]['command'])
                 if not reqIsValid:
+                    print("state: " + self.nextStates[0]['command'] + " is not valid")
                     self.nextStates.pop(0)
                 else:
-                    nextState = self.nextStates[0]
-                    self.nextStates.pop(0)
+                    print("state: " + self.nextStates[0]['command'] + " is valid")
+                    nextState = self.nextStates[0]['command']
+                    #maybe don't pop til the end of the next state?
+                    #self.nextStates.pop(0)
                     return nextState
                 
         #nothing pending
@@ -720,11 +752,16 @@ class FlyPawPilot(StateMachine):
 
         if self.missions:
             if self.missions[0].missionLeader == "basestation" or self.missions[0].missionLeader == "cloud":
-                return "instructionRequest"
+                self.nextStates = await self.instructionRequest()
+                if not self.nextStates:
+                    #if you get nothing back just fly
+                    self.nextStates.push("flight")
+                    return "flight"
+                    
         #if drone is the missionLeader, return flight
         return "flight"
     
-    async def runIperf(self, ipaddr):
+    async def runIperf(self, ipaddr, drone: Drone):
         x = uuid.uuid4()
         msg = {}
         msg['uuid'] = str(x)
@@ -744,6 +781,7 @@ class FlyPawPilot(StateMachine):
         msg['iperfResults']['port'] = client.port
         msg['iperfResults']['protocol'] = "tcp"
         msg['iperfResults']['location4d'] = [ iperfPosition.lat, iperfPosition.lon, iperfPosition.alt, iperfPosition.time ]
+        msg['iperfResults']['heading'] = [ self.currentHeading ]
         if err is not None:
             msg['iperfResults']['connection'] = err
             msg['iperfResults']['mbps'] = None
@@ -845,43 +883,6 @@ class FlyPawPilot(StateMachine):
                 return 0
         return 0
 
-    def instructionRequest(self, drone: Drone):
-        logState(self.logfiles['state'], "instructionRequest") #no longer a state, but still log it
-        x = uuid.uuid4()
-        msg = {}
-        msg['uuid'] = str(x)
-        msg['type'] = "instructionRequest"
-        serverReply = udpClientMsg(msg, self.basestationIP, 20001, 1)
-        if serverReply is not None:
-            print(serverReply['uuid_received'])
-            if serverReply['uuid_received'] == str(x):
-                print(serverReply['type_received'] + " receipt confirmed by UUID")
-                if 'requests' in serverReply:
-                    theseRequests = serverReply['requests']
-                    print(theseRequests)
-                    if serverReply['requests'] is not None:
-                        return theseRequests
-                        #thisPrimaryRequest = theseRequests[0] 
-                        #if 'command' in thisPrimaryRequest:
-                        #    requestIsValid = validateRequest(thisPrimaryRequest['command'])
-                        #    if requestIsValid:
-                        #        print("performing request: " + thisPrimaryRequest['command'])
-                        #        nextSequence = thisPrimaryRequest['command']
-                        #    else:
-                        #        print("request not valid.  Going to default action: " + nextSequence)
-                        
-                        #else:
-                        #    print("command not present in this request.  Going to default action: " + nextSequence)
-                    else:
-                        print("no requests at the moment. Drone to decide")
-                else:
-                    print("requests not present in server reply. Drone to decide")
-            else:
-                print ("uuid mismatched.  Drone to decide")
-        else:
-            print("No reply from server.  Drone to decide")
-
-        return None
     
 def getMissions(basestationIP):
     x = uuid.uuid4()
