@@ -49,10 +49,11 @@ class collectVideoInfo(object):
         self.priority = priority #normalized float 0-1
 
 class sendFrameInfo(object):
-    def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="8096", priority=1):
+    def __init__(self, dataformat="jpgframes", ipaddr="172.16.0.1", port="8096", chunksize="1024", priority=1):
         self.dataformat = dataformat #jpgframes, ffmpeg, etc
         self.ipaddr = ipaddr #string ip address
         self.port = port #int port number
+        self.chunksize = chunksize #int chunk size (for udp)
         self.priority = priority #normalized float 0-1
         
 class sendVideoInfo(object):
@@ -79,7 +80,7 @@ class missionInfo(object):
     #we'll have to think this through for different mission types
     def __init__(self):
         self.defaultWaypoints = [] #planfile
-        self.missionType = str #videography, delivery, air taxi, etc.
+        self.missionType = str #videography, fire, delivery, air taxi, etc.
         self.missionLeader = str #basestation, drone, cloud, edge device(s)
         self.priority = float #normalized float from 0-1
         self.planfile = str #path to planfile optional 
@@ -106,17 +107,17 @@ class VehicleCommands(object):
         self.commands['flight'] = {}
         
     def setIperfCommand(self, iperfObj):
-        self.commands['iperf'] = { "command" : "iperf", "protocol": iperfObj.protocol, "ipaddr": iperfObj.ipaddr, "port": iperfObj.port, "priority": iperfObj.priority } 
+        self.commands['iperf'] = { "command" : "iperf", "parameters": { "protocol": iperfObj.protocol, "ipaddr": iperfObj.ipaddr, "port": iperfObj.port, "priority": iperfObj.priority }} 
     def setCollectVideoCommand(self, collectVideoObj):
-        self.commands['collectVideo'] = { "command" : "collectVideo", "dataformat" : collectVideoObj.dataformat, "duration": collectVideoObj.duration, "quality": collectVideoObj.quality, "priority": collectVideoObj.priority }
+        self.commands['collectVideo'] = { "command" : "collectVideo", "parameters": { "dataformat" : collectVideoObj.dataformat, "duration": collectVideoObj.duration, "quality": collectVideoObj.quality, "priority": collectVideoObj.priority }}
     def setSendFrameCommand(self, sendFrameObj):
-        self.commands['sendFrame'] = { "command" : "sendFrame", "dataformat" : sendFrameObj.dataformat, "ipaddr": sendFrameObj.ipaddr, "port": sendFrameObj.port, "priority": sendFrameObj.priority  }
+        self.commands['sendFrame'] = { "command" : "sendFrame", "parameters": { "dataformat" : sendFrameObj.dataformat, "ipaddr": sendFrameObj.ipaddr, "port": sendFrameObj.port, "chunksize": sendFrameObj.chunksize, "priority": sendFrameObj.priority  }}
     def setSendVideoCommand(self, sendVideoObj):
-        self.commands['sendVideo'] = { "command" : "sendVideo", "dataformat" : sendVideoObj.dataformat, "ipaddr": sendVideoObj.ipaddr, "port": sendVideoObj.port, "priority": sendVideoObj.priority  }
+        self.commands['sendVideo'] = { "command" : "sendVideo", "parameters": { "dataformat" : sendVideoObj.dataformat, "ipaddr": sendVideoObj.ipaddr, "port": sendVideoObj.port, "priority": sendVideoObj.priority  }}
     def setFlightCommand(self, flightObj):
-        self.commands['flight'] = { "command" : "flight", "destination" : flightObj.destination, "speed": flightObj.speed, "priority": flightObj.priority }
+        self.commands['flight'] = { "command" : "flight", "parameters": { "destination" : flightObj.destination, "speed": flightObj.speed, "priority": flightObj.priority }}
     def setMissionCommand(self, missionObj):
-        self.commands['mission'] = { "command": "mission", "defaultWaypoints": missionObj.defaultWaypoints, "missionType": missionObj.missionType, "missionControl": missionObj.missionControl, "priority": missionObj.priority }
+        self.commands['mission'] = { "command": "mission", "parameters": { "defaultWaypoints": missionObj.defaultWaypoints, "missionType": missionObj.missionType, "missionControl": missionObj.missionControl, "priority": missionObj.priority }}
 
 class droneSim(object):
     def __init__(self):

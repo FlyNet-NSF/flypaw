@@ -304,6 +304,10 @@ class FlyPawBasestationAgent(object):
         if self.missions[0].missionType == "Bandwidth":
             print("received telemetry, asking for iperf")
             self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
+
+        if self.missions[0].missionType == "fire":
+            print("received telemetry, asking for iperf")
+            self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
             
         return
 
