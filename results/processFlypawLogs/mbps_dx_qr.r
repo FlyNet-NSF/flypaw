@@ -1,0 +1,30 @@
+library("quantreg")
+csv_data <- read.csv("experiment_distance_scatter.txt")
+X <- csv_data$distance
+Y <- csv_data$mbps
+highconf <- .8
+lowconf <- .2
+appreq = 15
+hperc <- sprintf("%d%% Quantile", highconf*100)
+lperc <- sprintf("%d%% Quantile", lowconf*100)
+plot(Y ~ X, xlab = "Distance (m)", ylab = "Downlink Data Rate (mbps)", main = "Downlink Data Rate vs Transmitter Distance")
+modh <- rq(Y ~ log(X), data=csv_data, tau = highconf)
+pDFh <- data.frame(X = seq(1, 110, length = 110))
+pDFh <- within(pDFh, Y <- predict(modh, newdata = pDFh))
+lines(Y ~ X, data = pDFh, col = "green", lwd = 3)
+modl <- rq(Y ~ log(X), data=csv_data, tau = lowconf)
+pDFl <- data.frame(X = seq(1, 110, length = 110))
+pDFl <- within(pDFl, Y <- predict(modl, newdata = pDFl))
+lines(Y ~ X, data = pDFl, col = "red", lwd = 3)
+mod <- rq(Y ~ log(X), data=csv_data, tau = .5)
+pDF <- data.frame(X = seq(1, 110, length = 110))
+pDF <- within(pDF, Y <- predict(mod, newdata = pDF))
+lines(Y ~ X, data = pDF, col = "blue", lwd = 3)
+appreq_mod <- data.frame(X = seq(1, 500, length = 100))
+appreq_mod <- within(appreq_mod, Y <- appreq)
+lines(Y ~ X, data = appreq_mod, col = "orange", lwd = 3)
+app_int_h <- data.frame(Y = seq(0, 50, length = 100), X = seq(71,71, length = 100))
+lines(Y ~ X, data = app_int_h, col = "red", lwd = 3, lty = 2)
+app_int_l <- data.frame(Y = seq(0, 50, length = 100), X = seq(99.5,99.5, length = 100))
+lines(Y ~ X, data = app_int_l, col = "green", lwd = 3, lty = 2)
+legend("bottomleft", legend=c(hperc, lperc, "Median Data Rate", "Application Requirement", "High End Limit", "Low End Limit"), col=c("green","red","blue","orange","red","green"), lty=c(1,1,1,1,2,2), lwd=c(2,2,2,2,2,2), cex=0.8)
