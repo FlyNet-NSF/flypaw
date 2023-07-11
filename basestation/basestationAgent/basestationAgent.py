@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
+from http import client
 import socket
 import pickle
 import json
+from telnetlib import STATUS
 import geojson as gj
 import sys
 import pytz
 import requests
 import time
-from mobius.controller.controller import Controller
+#from mobius.controller.controller import Controller
+from geographiclib.geodesic import Geodesic
 
-from flypawClasses import iperfInfo, sendVideoInfo, sendFrameInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
+from flypawClasses import iperfInfo, sendVideoInfo, sendFrameInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim, MissionObjective, Position
 
 #from cloud_resources import CloudResources
 
@@ -181,12 +184,61 @@ def getPlanFromPlanfile(filepath):
     pathdata = json.load(f)
     f.close()
     return pathdata
-
+#This function processes the raw plan. It really should have a defined plan structure to pass to the Drone and back to the Main file...
 def processPlan(plan):
     processedPlan = {}
+    missionObjectives = []
+    default_waypoints = []
+    processedPlan['STATUS'] = "UNINITIALIZED" 
+    if not plan['fileType'] == "TaskQ_Plan":
+        print("Wrong Plan file Format")
+        return processedPlan
+    if not 'mission' in plan:
+        print("No mission in planfile")
+        return processedPlan
+    if not 'plannedHomePosition' in plan['mission']:
+        print("No planned home position")
+        return processedPlan
+    php = plan['mission']['plannedHomePosition']
+
+    thisWaypoint = [php[1],php[0],0] #I don't want to append the the PLanned Home Position to the start anymore
+    lastWaypoint = thisWaypoint
+    if not 'items' in plan['mission']: #Empty mission
+        print("No items")
+        return processedPlan
+    theseItems = plan['mission']['items']
+    for thisItem in theseItems:
+        if 'params' in thisItem:
+            if not len(thisItem['params']) == 7:
+                print("incorrect number of params")
+            else:
+                thisWaypoint = [thisItem['params'][5], thisItem['params'][4], thisItem['params'][6]]
+                if thisWaypoint[0] == 0:
+                    thisWaypoint[0] = lastWaypoint[0]
+                if thisWaypoint[1] == 0:
+                    thisWaypoint[1] = lastWaypoint[1]
+                default_waypoints.append(thisWaypoint)
+                lastWaypoint = thisWaypoint
+                position = Position()
+                position.InitParams(thisWaypoint[0],thisWaypoint[1],thisWaypoint[2],0,0,0)
+                objective = MissionObjective(position,thisItem['TASK'],False)
+                missionObjectives.append(objective)
+
+    print (default_waypoints)
+    processedPlan['default_waypoints'] = default_waypoints
+    processedPlan["STATUS"] = "PROCESSED"
+    processedPlan["objectives"] = missionObjectives
+    return processedPlan
+"""
+Dont really need this function right now, but I am keeping it around incase I want to be able to accept QGroundMission as well-------------------------------
+
+def processPlan_QGROUND_STANDARD(plan):
+    processedPlan = {}
+
     default_waypoints = []
     if not 'mission' in plan:
         print("No mission in planfile")
+
         return None
     if not 'plannedHomePosition' in plan['mission']:
         print("No planned home position")
@@ -223,6 +275,7 @@ def processPlan(plan):
     print (default_waypoints)
     processedPlan['default_waypoints'] = default_waypoints
     return processedPlan
+"""
 
 class FlyPawBasestationAgent(object):
     def __init__(self, ipaddr="172.16.0.1", port=20001, chunkSize=1024) :
@@ -255,18 +308,30 @@ class FlyPawBasestationAgent(object):
         mission.missionType = "fire" #"bandwidth", "videography", "fire"
         mission.missionLeader = "basestation" #drone or basestation or cloud
         mission.priority = 1
-        mission.planfile = "./plans/mission.plan"
+        mission.planfile = "./plans/simplePlan_TaskQ.plan"
         mission.default_waypoints = []
         plan = getPlanFromPlanfile(mission.planfile)
         processedPlan = processPlan(plan)
-        mission.default_waypoints = processedPlan['default_waypoints']
+        if processedPlan['STATUS'] == "UNINITIALIZED":
+            mission.STATUS = "FAILED"
+        elif processedPlan['STATUS'] == "PROCESSED":
+            mission.STATUS = "PROCESSED"
+            mission.default_waypoints = processedPlan['default_waypoints']
+            mission.missionObjectives = processedPlan['objectives']
+
         mission.resources = False
         self.missions.append(mission)
         if mission.resources:
             self.cloud_mgr = Controller(config_file_location="./config.yml")
         else:
             self.cloud_mgr = None
-            
+        self.RadioPosition = Position()
+        self.RadioPosition.InitParams(-78.69607,35.72744,0,0,0,0)
+        self.DistanceOfFailure = 150
+        self.LastKnownDronePosition = self.RadioPosition
+
+
+
     def update_digital_twin(self):
         """
         function call to update the digital twin with different types of incoming data   
@@ -302,10 +367,6 @@ class FlyPawBasestationAgent(object):
 
         #set command based on mission                                                                                                                                          
         if self.missions[0].missionType == "Bandwidth":
-            print("received telemetry, asking for iperf")
-            self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
-
-        if self.missions[0].missionType == "fire":
             print("received telemetry, asking for iperf")
             self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
             
@@ -404,11 +465,11 @@ class FlyPawBasestationAgent(object):
         else:
             updateResp['registration'] = "FAILED"
         return updateResp['registration']
-            
+    #BASESTATION DISPATCH OLD -----------------VESTIGAL
     def basestationDispatch(self):
         UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         UDPServerSocket.bind((self.ipaddr, self.port))
-        print("UDP server up and listening")
+        print("UDP server up and listening, IP:" + str(self.ipaddr) + " port: " + str(self.port))
 
         while(True):
             msgFromServer = {}
@@ -432,7 +493,14 @@ class FlyPawBasestationAgent(object):
 
                 ##############check message type from drone and decide what to do###################
                 if msgType == "mission":
-                    msgFromServer['missions'] = self.missions
+                    validMissions = []
+
+                    for ms in self.missions:
+                        if ms.STATUS == "PROCESSED" :
+                            validMissions.append(ms)
+                    print("Dispatcher-- mission check" + str(validMissions[0].missionObjectives))
+                    msgFromServer['missions'] = validMissions
+                    
                     
                 elif msgType == "acceptMission":
                     #if you have an outside connection only
@@ -596,6 +664,7 @@ class FlyPawBasestationAgent(object):
                     self.currentRequests.append(self.vehicleCommands.commands['flight'])
                 try: 
                     serialMsgFromServer = pickle.dumps(msgFromServer)
+                    print("Pickle Packet Size: " + str(len(pickle.dumps(msgFromServer,-1))))
                     UDPServerSocket.sendto(serialMsgFromServer, address)
                 except pickle.PicklingError as pe:
                     print ("cannot encode reply msg: " + pe)
@@ -603,7 +672,229 @@ class FlyPawBasestationAgent(object):
             except pickle.UnpicklingError as upe:
                 print("cannot decode message from drone: " + upe)
 
+    def DroneDistance(self, dronePosition):
+        geo = Geodesic.WGS84.Inverse(dronePosition.lat, dronePosition.lon, self.RadioPosition.lat, self.RadioPosition.lon)
+        distance_to_base = geo.get('s12')
+        return distance_to_base
+
+
+
+    def basestationDispatch_SIM(self):#Simulates an unreliable connection. Doesn't respond if there is no connection
+        UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        UDPServerSocket.bind((self.ipaddr, self.port))
+        print("UDP server up and listening")
+
+        while(True):
+            msgFromServer = {}
+            bytesAddressPair = UDPServerSocket.recvfrom(self.chunkSize)
+            serialClientMessage = bytesAddressPair[0]
+            address = bytesAddressPair[1]
+            try:
+                clientMessage = pickle.loads(serialClientMessage)    
+                print(clientMessage['type'])
+        
+                recvdMsg = "Message from Drone:{}".format(clientMessage)
+                clientIP  = "Drone IP Address:{}".format(address)
+                print(recvdMsg)
+                print(clientIP)
+                recvTime = datetime.now().astimezone().isoformat()
+                msgFromServer['time_received'] = recvTime
+                recvUUID = clientMessage['uuid']
+                msgFromServer['uuid_received'] = recvUUID
+                msgType = clientMessage['type']
+                msgFromServer['type_received'] = msgType
+                msgFromServer['drone_position'] = clientMessage['CUR_POS']
+                self.LastKnownDronePosition = clientMessage['CUR_POS']
+                ##############check message type from drone and decide what to do###################
+                if msgType == "mission":
+                    validMissions = []
+
+                    for ms in self.missions:
+                        if ms.STATUS == "PROCESSED" :
+                            validMissions.append(ms)
+                    print("Dispatcher-- mission check" + str(validMissions[0].missionObjectives))
+                    msgFromServer['missions'] = validMissions
+                    
+                    
+                elif msgType == "acceptMission":
+                    #if you have an outside connection only
+                    if self.missions[0].resources:
+                        #register in ACS  (once it's working move it down below the get resources
+                        
+                        """
+                        ACS registration
+                        """
+                        registered = self.register_acs()
+                        if not registered:
+                            msgFromServer['missionstatus'] = "canceled"
+                            return
+                    
+                        #if we're registered properly...
+                        #get cloud resources and configure to mission
+                        self.cloud_mgr.create()
+                        time.sleep(3)
+                        slices = self.cloud_mgr.get_resources()
+                        for s in slices:
+                            for n in s.get_nodes():
+                                thisResourceInfo = resourceInfo()
+                                thisResourceInfo.name = n.get_name()
+                                thisResourceInfo.location = "KVM@TACC" #extract algorithmically
+                                thisResourceInfo.purpose = "mission" #get from mission somehow
+                            
+                                m_ip = ("management", n.get_management_ip())
+                                e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
+                                thisResourceInfo.resourceAddresses.append(m_ip)
+                                thisResourceInfo.resourceAddresses.append(e_ip)
+                                thisResourceInfo.state = n.get_reservation_state()
+                                self.resourceList.append(thisResourceInfo)
+                        print("giving resources 60 seconds to come online")
+                        time.sleep(60)
+
+                    # Now that you have the IP addresses, configure anything on the basestation
+                    fail = configureBasestationProcesses(self.missions[0],self.resourceList)
+                    if (fail):
+                        msgFromServer['missionstatus'] = "canceled"
+
+                        if self.missions[0].resources:
+                            #delete the cloud resources 
+                            for s in slices:
+                                for n in s.get_nodes():
+                                    n.delete()
+                            #self.cloud_mgr.delete()
+                            return
+                    
+                    if self.missions[0].resources:
+                        # now configure nodes...
+                        """
+                        Mission Library Installation on Cloud Nodes
+                        """
+                        missionLibraries = getMissionLibraries(self.missions[0], self.resourceList)
+
+                        for s in slices:
+                            nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Install Libraries for nodeName: " + nodeName)
+                                #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
+                                #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
+                                #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
+                                #stdout, stderr = node.execute(getRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                #stdout, stderr = node.execute(installRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                #stdout, stderr = node.execute(swapRepoStr)
+                                #print(stdout)
+                                #print(stderr)
+                                for library in missionLibraries[nodeno]:
+                                    #libraryInstallStr = "sudo dnf -y install " + library #centos8 
+                                    libraryInstallStr = "sudo yum -y install " + library #centos7
+                                    print(nodeName + ": " + libraryInstallStr)
+                                    stdout, stderr = node.execute(libraryInstallStr)
+                                    print(stdout)
+                                    print(stderr)
+                                nodeno = nodeno + 1
+
+                        #now install and run any preflight commands/configuration on the nodes
+                        # ideally this would be coordinated be done through KubeCtl or something
+                        missionResourcesCommands = getMissionResourcesCommands(self.missions[0],self.resourceList)
+                        for s in slices:
+                            nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Run Commands for nodeName: " + nodeName)
+                                for command in missionResourcesCommands[nodeno]:
+                                    print("command: " + command)
+                                    stdout, stderr = node.execute(command)
+                                    print(stdout)
+                                    print(stderr)
+                                nodeno = nodeno + 1
+
+                    msgFromServer['missionstatus'] = "confirmed"
+                    
+                elif msgType == "resourceInfo":
+                    msgFromServer['resources'] = self.resourceList 
+                    
+                elif msgType == "telemetry":
+                    #update your digital twin, update registry, pass on to downstream applications
+                    self.handle_telemetry(clientMessage)
+                    
+                elif msgType == "instructionRequest":
+                    msgFromServer['requests'] = self.currentRequests
+                    self.currentRequests = []
+
+                elif msgType == "iperfResults":
+                    self.iperf3Agent.ipaddr = clientMessage[msgType]['ipaddr']
+                    self.iperf3Agent.port = clientMessage[msgType]['port']
+                    self.iperf3Agent.protocol = clientMessage[msgType]['protocol']
+                    self.iperf3Agent.mbps = clientMessage[msgType]['mbps']
+                    self.iperf3Agent.meanrtt = clientMessage[msgType]['meanrtt']
+                    self.iperf3Agent.location4d = clientMessage[msgType]['location4d']
+                    self.iperfHistory.append(self.iperf3Agent)
+                    if self.iperf3Agent.mbps is not None:
+                        if self.iperf3Agent.mbps > 1:
+                            self.currentRequests.append(self.vehicleCommands.commands['sendFrame'])
+                        else:
+                            self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                    else:
+                        self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "sendFrame":
+                    self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "sendVideo":
+                    self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                elif msgType == "abortMission":
+                    print ("mission abort... prepare for landing")
+                elif msgType == "completed":
+                    #download your log files from the cloud
+                    #missionCompletionCommands = getMissionCompletionCommands(self.missions[0],self.resourceList)
+                    if self.missions[0].resources:
+                        for s in slices:
+                            #nodeno = 0
+                            for node in s.get_nodes():
+                                nodeName = node.get_name()
+                                print("Run Commands for nodeName: " + nodeName)
+                                logTime = datetime.now().astimezone().isoformat()
+                                iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
+                                node.download_file(iperfLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
+                                darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
+                                node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
+                            
+                                #for command in missionResourcesCommands[nodeno]:
+                                #    print("command: " + command)
+                                #    stdout, stderr = node.execute(command)
+		                #    print(stdout)
+                                #    print(stderr)
+                                #nodeno = nodeno + 1
+                                print("Deleting: " + nodeName)
+                                nodeDelete = node.delete()
+
+                                # delete the cloud resources
+                                #self.cloud_mgr.delete()
+                    print("flight complete")
+                    sys.exit()
+                else:
+                    print("msgType: " + msgType)
+                    self.currentRequests.append(self.vehicleCommands.commands['flight'])
+                try: 
+                    serialMsgFromServer = pickle.dumps(msgFromServer)
+                    print("Pickle Packet Size: " + str(len(pickle.dumps(msgFromServer,-1))))
+                    droneDistance = self.DroneDistance(self.LastKnownDronePosition)
+                    print("Distance to Drone: "+str(droneDistance)+" m")
+                    if(droneDistance<=self.DistanceOfFailure):
+                        UDPServerSocket.sendto(serialMsgFromServer, address)
+                    else:
+                        print("Too far...SimulatingBrokenConnection!")
+
+                except pickle.PicklingError as pe:
+                    print ("cannot encode reply msg: " + pe)
+                
+            except pickle.UnpicklingError as upe:
+                print("cannot decode message from drone: " + upe)
+
+
+
 
 if __name__ == '__main__':
     FPBA = FlyPawBasestationAgent()
-    FPBA.basestationDispatch()
+    FPBA.basestationDispatch_SIM()

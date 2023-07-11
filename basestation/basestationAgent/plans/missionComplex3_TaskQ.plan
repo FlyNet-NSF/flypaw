@@ -70,7 +70,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "TASK": "IPERF"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -110,7 +110,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IPERF"
+                "TASK": "IMAGE_LOCATION_QUICK"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -150,7 +150,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "TASK": "IPERF"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -170,7 +170,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IPERF"
+                "TASK": "IMAGE_LOCATION_QUICK"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -210,7 +210,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "TASK": "IPERF"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -250,7 +250,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IPERF"
+                "TASK": "IMAGE_LOCATION_QUICK"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -270,7 +270,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "TASK": "IPERF"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -290,7 +290,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IPERF"
+                "TASK": "IMAGE_LOCATION_QUICK"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -350,7 +350,7 @@
                     30
                 ],
                 "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "TASK": "IPERF"
             },
             {
                 "AMSLAltAboveTerrain": null,

@@ -1,8 +1,10 @@
 {
-    "fileType": "TaskQ_Plan",
+    "fileType": "Plan",
     "geoFence": {
-        "circles": [],
-        "polygons": [],
+        "circles": [
+        ],
+        "polygons": [
+        ],
         "version": 2
     },
     "groundStation": "QGroundControl",
@@ -29,8 +31,7 @@
                     -78.6961098,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -49,8 +50,7 @@
                     -78.69646008377433,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -69,8 +69,7 @@
                     -78.69645508705607,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -89,8 +88,7 @@
                     -78.69645172526843,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -109,8 +107,7 @@
                     -78.69648662291327,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -129,8 +126,7 @@
                     -78.69713291326738,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -149,8 +145,7 @@
                     -78.69773421319783,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -169,8 +164,7 @@
                     -78.69746055843234,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -189,8 +183,7 @@
                     -78.69685840135652,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -209,8 +202,7 @@
                     -78.69687225670279,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -229,8 +221,7 @@
                     -78.69743907,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -249,8 +240,7 @@
                     -78.6979494,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -269,8 +259,7 @@
                     -78.69799193,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -289,8 +278,7 @@
                     -78.6979607,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -309,8 +297,7 @@
                     -78.6977567,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -329,8 +316,7 @@
                     -78.69741648,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -349,8 +335,7 @@
                     -78.69712161186231,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IMAGE_LOCATION_QUICK"
+                "type": "SimpleItem"
             },
             {
                 "AMSLAltAboveTerrain": null,
@@ -369,8 +354,7 @@
                     -78.69681827656765,
                     30
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             },
             {
                 "autoContinue": true,
@@ -386,8 +370,7 @@
                     0,
                     0
                 ],
-                "type": "SimpleItem",
-                "TASK": "IPERF"
+                "type": "SimpleItem"
             }
         ],
         "plannedHomePosition": [
@@ -399,7 +382,8 @@
         "version": 2
     },
     "rallyPoints": {
-        "points": [],
+        "points": [
+        ],
         "version": 2
     },
     "version": 1
