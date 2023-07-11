@@ -1,0 +1,444 @@
+{"connection": "ok", "unixsecs": 1643240778.31977, "mbps": 9954424.868346, "jitter_ms": 12.443}
+{"connection": "ok", "unixsecs": 1643240779.493562, "mbps": 9952116.775508, "jitter_ms": 11.031}
+{"connection": "ok", "unixsecs": 1643240780.668415, "mbps": 9954106.937936, "jitter_ms": 10.328}
+{"connection": "ok", "unixsecs": 1643240781.840436, "mbps": 9953838.848224, "jitter_ms": 10.479}
+{"connection": "ok", "unixsecs": 1643240783.025457, "mbps": 9953691.760889, "jitter_ms": 9.783}
+{"connection": "ok", "unixsecs": 1643240784.217807, "mbps": 9954394.023461, "jitter_ms": 11.529}
+{"connection": "ok", "unixsecs": 1643240785.387898, "mbps": 9953691.760889, "jitter_ms": 10.771}
+{"connection": "ok", "unixsecs": 1643240786.562046, "mbps": 9953860.199973, "jitter_ms": 9.968}
+{"connection": "ok", "unixsecs": 1643240787.732817, "mbps": 9953950.35281, "jitter_ms": 10.885}
+{"connection": "ok", "unixsecs": 1643240788.897936, "mbps": 9954218.448528, "jitter_ms": 10.148}
+{"connection": "ok", "unixsecs": 1643240790.075836, "mbps": 9953729.718495, "jitter_ms": 9.975}
+{"connection": "ok", "unixsecs": 1643240791.261357, "mbps": 9953947.980346, "jitter_ms": 9.411}
+{"connection": "ok", "unixsecs": 1643240792.44289, "mbps": 9953988.312388, "jitter_ms": 10.959}
+{"connection": "ok", "unixsecs": 1643240793.63156, "mbps": 9954564.859071, "jitter_ms": 10.393}
+{"connection": "ok", "unixsecs": 1643240794.811983, "mbps": 9954823.49636, "jitter_ms": 10.363}
+{"connection": "ok", "unixsecs": 1643240795.990058, "mbps": 9954496.049578, "jitter_ms": 10.943}
+{"connection": "ok", "unixsecs": 1643240797.202381, "mbps": 9953440.299063, "jitter_ms": 10.103}
+{"connection": "ok", "unixsecs": 1643240798.37595, "mbps": 9954334.706913, "jitter_ms": 10.033}
+{"connection": "ok", "unixsecs": 1643240799.562584, "mbps": 9954306.235221, "jitter_ms": 10.81}
+{"connection": "ok", "unixsecs": 1643240800.738869, "mbps": 9954624.178362, "jitter_ms": 10.037}
+{"connection": "ok", "unixsecs": 1643240801.913172, "mbps": 9953947.980346, "jitter_ms": 10.84}
+{"connection": "ok", "unixsecs": 1643240803.085016, "mbps": 9954078.467546, "jitter_ms": 9.93}
+{"connection": "ok", "unixsecs": 1643240804.269422, "mbps": 9954287.254183, "jitter_ms": 10.471}
+{"connection": "ok", "unixsecs": 1643240805.446541, "mbps": 9954208.958168, "jitter_ms": 10.325}
+{"connection": "ok", "unixsecs": 1643240806.637671, "mbps": 9954365.55143, "jitter_ms": 9.796}
+{"connection": "ok", "unixsecs": 1643240807.80173, "mbps": 9954417.750279, "jitter_ms": 10.3}
+{"connection": "ok", "unixsecs": 1643240808.991696, "mbps": 9953966.96009, "jitter_ms": 10.092}
+{"connection": "ok", "unixsecs": 1643240810.180282, "mbps": 9953312.200753, "jitter_ms": 9.227}
+{"connection": "ok", "unixsecs": 1643240811.359926, "mbps": 9953611.101938, "jitter_ms": 10.254}
+{"connection": "ok", "unixsecs": 1643240812.533904, "mbps": 9953162.756892, "jitter_ms": 9.843}
+{"connection": "ok", "unixsecs": 1643240813.710922, "mbps": 9953601.612736, "jitter_ms": 8.775}
+{"connection": "ok", "unixsecs": 1643240814.886342, "mbps": 9953917.138417, "jitter_ms": 10.386}
+{"connection": "ok", "unixsecs": 1643240816.07263, "mbps": 9953580.262096, "jitter_ms": 10.44}
+{"connection": "ok", "unixsecs": 1643240817.246882, "mbps": 9954408.259538, "jitter_ms": 11.178}
+{"connection": "ok", "unixsecs": 1643240818.435489, "mbps": 9954227.938907, "jitter_ms": 9.349}
+{"connection": "ok", "unixsecs": 1643240819.605229, "mbps": 9954315.725767, "jitter_ms": 11.968}
+{"connection": "ok", "unixsecs": 1643240820.794804, "mbps": 9953468.765801, "jitter_ms": 9.571}
+{"connection": "ok", "unixsecs": 1643240821.962532, "mbps": 9954655.024673, "jitter_ms": 10.709}
+{"connection": "ok", "unixsecs": 1643240823.115798, "mbps": 9953760.559263, "jitter_ms": 9.932}
+{"connection": "ok", "unixsecs": 1643240824.303501, "mbps": 9954408.259538, "jitter_ms": 9.535}
+{"connection": "ok", "unixsecs": 1643240825.474779, "mbps": 9953241.03645, "jitter_ms": 9.267}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240825, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240827.686699, "mbps": 9952107.289154, "jitter_ms": 9.695}
+{"connection": "ok", "unixsecs": 1643240828.84888, "mbps": 9951322.35607, "jitter_ms": 10.76}
+{"connection": "ok", "unixsecs": 1643240830.020648, "mbps": 9954287.254183, "jitter_ms": 9.643}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240830, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240832.228257, "mbps": 9954016.782262, "jitter_ms": 9.195}
+{"connection": "ok", "unixsecs": 1643240833.404194, "mbps": 9953789.027833, "jitter_ms": 8.57}
+{"connection": "ok", "unixsecs": 1643240834.594717, "mbps": 9954147.271266, "jitter_ms": 10.13}
+{"connection": "ok", "unixsecs": 1643240835.764428, "mbps": 9954097.447788, "jitter_ms": 10.525}
+{"connection": "ok", "unixsecs": 1643240836.921696, "mbps": 9953938.490501, "jitter_ms": 10.119}
+{"connection": "ok", "unixsecs": 1643240838.100457, "mbps": 9954078.467546, "jitter_ms": 10.215}
+{"connection": "ok", "unixsecs": 1643240839.300306, "mbps": 9953729.718495, "jitter_ms": 9.906}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240839, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240841.528722, "mbps": 9953860.199973, "jitter_ms": 9.242}
+{"connection": "ok", "unixsecs": 1643240842.705369, "mbps": 9954477.067817, "jitter_ms": 9.436}
+{"connection": "ok", "unixsecs": 1643240843.869164, "mbps": 9954396.396138, "jitter_ms": 10.296}
+{"connection": "ok", "unixsecs": 1643240845.050951, "mbps": 9954137.781041, "jitter_ms": 9.875}
+{"connection": "ok", "unixsecs": 1643240846.21435, "mbps": 9954574.35011, "jitter_ms": 10.067}
+{"connection": "ok", "unixsecs": 1643240847.376748, "mbps": 9953869.689668, "jitter_ms": 9.98}
+{"connection": "ok", "unixsecs": 1643240848.555519, "mbps": 9953919.510866, "jitter_ms": 9.495}
+{"connection": "ok", "unixsecs": 1643240849.730713, "mbps": 9954614.687228, "jitter_ms": 10.707}
+{"connection": "ok", "unixsecs": 1643240850.91429, "mbps": 9954645.53348, "jitter_ms": 8.836}
+{"connection": "ok", "unixsecs": 1643240852.087372, "mbps": 9953580.262096, "jitter_ms": 9.757}
+{"connection": "ok", "unixsecs": 1643240853.266983, "mbps": 9954723.836363, "jitter_ms": 10.033}
+{"connection": "ok", "unixsecs": 1643240854.445329, "mbps": 9953789.027833, "jitter_ms": 9.11}
+{"connection": "ok", "unixsecs": 1643240855.602307, "mbps": 9953421.321327, "jitter_ms": 9.538}
+{"connection": "ok", "unixsecs": 1643240856.771716, "mbps": 9953658.548221, "jitter_ms": 9.859}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240856, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240858.988484, "mbps": 9954377.414756, "jitter_ms": 9.932}
+{"connection": "ok", "unixsecs": 1643240860.145106, "mbps": 9954216.075937, "jitter_ms": 10.315}
+{"connection": "ok", "unixsecs": 1643240861.303682, "mbps": 9954016.782262, "jitter_ms": 9.765}
+{"connection": "ok", "unixsecs": 1643240862.490825, "mbps": 9953966.96009, "jitter_ms": 8.928}
+{"connection": "ok", "unixsecs": 1643240863.662227, "mbps": 9954545.877047, "jitter_ms": 9.674}
+{"connection": "ok", "unixsecs": 1643240864.845266, "mbps": 9954287.254183, "jitter_ms": 9.658}
+{"connection": "ok", "unixsecs": 1643240866.013024, "mbps": 9953739.207941, "jitter_ms": 9.764}
+{"connection": "ok", "unixsecs": 1643240867.17924, "mbps": 9953281.362763, "jitter_ms": 10.235}
+{"connection": "ok", "unixsecs": 1643240868.373051, "mbps": 9953976.449989, "jitter_ms": 8.906}
+{"connection": "ok", "unixsecs": 1643240869.548411, "mbps": 9953810.379368, "jitter_ms": 10.09}
+{"connection": "ok", "unixsecs": 1643240870.708484, "mbps": 9954007.292286, "jitter_ms": 9.394}
+{"connection": "ok", "unixsecs": 1643240871.87552, "mbps": 9954087.957658, "jitter_ms": 10.245}
+{"connection": "ok", "unixsecs": 1643240873.033713, "mbps": 9951301.015208, "jitter_ms": 9.634}
+{"connection": "ok", "unixsecs": 1643240874.194734, "mbps": 9954066.604932, "jitter_ms": 9.571}
+{"connection": "ok", "unixsecs": 1643240875.35634, "mbps": 9954028.644757, "jitter_ms": 9.55}
+{"connection": "ok", "unixsecs": 1643240876.53012, "mbps": 9953689.388548, "jitter_ms": 9.574}
+{"connection": "ok", "unixsecs": 1643240877.693755, "mbps": 9953670.409863, "jitter_ms": 8.801}
+{"connection": "ok", "unixsecs": 1643240878.855362, "mbps": 9954078.467546, "jitter_ms": 9.465}
+{"connection": "ok", "unixsecs": 1643240880.046792, "mbps": 9951104.209347, "jitter_ms": 8.615}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240880, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240882.249299, "mbps": 9954405.886856, "jitter_ms": 9.283}
+{"connection": "ok", "unixsecs": 1643240883.420808, "mbps": 9954434.359118, "jitter_ms": 9.574}
+{"connection": "ok", "unixsecs": 1643240884.592448, "mbps": 9953798.517393, "jitter_ms": 9.817}
+{"connection": "ok", "unixsecs": 1643240885.768055, "mbps": 9953222.059474, "jitter_ms": 9.961}
+{"connection": "ok", "unixsecs": 1643240886.93892, "mbps": 9953499.604952, "jitter_ms": 9.797}
+{"connection": "ok", "unixsecs": 1643240888.11916, "mbps": 9953660.920547, "jitter_ms": 10.196}
+{"connection": "ok", "unixsecs": 1643240889.308022, "mbps": 9954306.235221, "jitter_ms": 10.171}
+{"connection": "ok", "unixsecs": 1643240890.488784, "mbps": 9953938.490501, "jitter_ms": 10.12}
+{"connection": "ok", "unixsecs": 1643240891.665559, "mbps": 9951798.992513, "jitter_ms": 9.528}
+{"connection": "ok", "unixsecs": 1643240892.827307, "mbps": 9954106.937936, "jitter_ms": 9.526}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240892, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240895.026895, "mbps": 9954415.377592, "jitter_ms": 10.893}
+{"connection": "ok", "unixsecs": 1643240896.207309, "mbps": 9954496.049578, "jitter_ms": 9.151}
+{"connection": "ok", "unixsecs": 1643240897.380583, "mbps": 9953440.299063, "jitter_ms": 9.774}
+{"connection": "ok", "unixsecs": 1643240898.56832, "mbps": 9954802.140478, "jitter_ms": 9.876}
+{"connection": "ok", "unixsecs": 1643240899.733368, "mbps": 9953860.199973, "jitter_ms": 8.984}
+{"connection": "ok", "unixsecs": 1643240900.905637, "mbps": 9953819.868969, "jitter_ms": 9.738}
+{"connection": "ok", "unixsecs": 1643240902.076258, "mbps": 9954256.410151, "jitter_ms": 9.737}
+{"connection": "ok", "unixsecs": 1643240903.238719, "mbps": 9954315.725767, "jitter_ms": 9.366}
+{"connection": "ok", "unixsecs": 1643240904.416345, "mbps": 9953490.115962, "jitter_ms": 9.407}
+{"connection": "ok", "unixsecs": 1643240905.577087, "mbps": 9953181.733642, "jitter_ms": 9.558}
+{"connection": "ok", "unixsecs": 1643240906.748661, "mbps": 9954496.049578, "jitter_ms": 9.723}
+{"connection": "ok", "unixsecs": 1643240907.92734, "mbps": 9953997.802328, "jitter_ms": 9.695}
+{"connection": "ok", "unixsecs": 1643240909.098275, "mbps": 9954087.957658, "jitter_ms": 10.041}
+{"connection": "ok", "unixsecs": 1643240910.272534, "mbps": 9954000.174816, "jitter_ms": 9.684}
+{"connection": "ok", "unixsecs": 1643240911.44711, "mbps": 9951929.423376, "jitter_ms": 9.312}
+{"connection": "ok", "unixsecs": 1643240912.629225, "mbps": 9954187.604923, "jitter_ms": 9.796}
+{"connection": "ok", "unixsecs": 1643240913.807198, "mbps": 9954007.292286, "jitter_ms": 10.111}
+{"connection": "ok", "unixsecs": 1643240914.968009, "mbps": 9954047.624809, "jitter_ms": 9.644}
+{"connection": "ok", "unixsecs": 1643240916.142946, "mbps": 9954643.160685, "jitter_ms": 10.062}
+{"connection": "ok", "unixsecs": 1643240917.314424, "mbps": 9954028.644757, "jitter_ms": 9.285}
+{"connection": "ok", "unixsecs": 1643240918.485744, "mbps": 9954337.079561, "jitter_ms": 9.986}
+{"connection": "ok", "unixsecs": 1643240919.655688, "mbps": 9954436.731814, "jitter_ms": 9.769}
+{"connection": "ok", "unixsecs": 1643240920.808317, "mbps": 9953867.317243, "jitter_ms": 9.234}
+{"connection": "ok", "unixsecs": 1643240921.974797, "mbps": 9949681.747879, "jitter_ms": 9.503}
+{"connection": "ok", "unixsecs": 1643240923.142749, "mbps": 9953888.669113, "jitter_ms": 9.625}
+{"connection": "ok", "unixsecs": 1643240924.330052, "mbps": 9954135.408488, "jitter_ms": 8.582}
+{"connection": "ok", "unixsecs": 1643240925.500041, "mbps": 9953770.048768, "jitter_ms": 9.155}
+{"connection": "ok", "unixsecs": 1643240926.662535, "mbps": 9953589.751258, "jitter_ms": 9.232}
+{"connection": "ok", "unixsecs": 1643240927.829947, "mbps": 9954009.664778, "jitter_ms": 9.476}
+{"connection": "ok", "unixsecs": 1643240928.99197, "mbps": 9954704.853733, "jitter_ms": 9.39}
+{"connection": "ok", "unixsecs": 1643240930.156133, "mbps": 9954258.782762, "jitter_ms": 9.951}
+{"connection": "ok", "unixsecs": 1643240931.323295, "mbps": 9954507.913216, "jitter_ms": 8.98}
+{"connection": "ok", "unixsecs": 1643240932.483979, "mbps": 9953530.444294, "jitter_ms": 9.589}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240932, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240934.709013, "mbps": 9954643.160685, "jitter_ms": 9.767}
+{"connection": "ok", "unixsecs": 1643240935.872048, "mbps": 9954125.918286, "jitter_ms": 9.558}
+{"connection": "ok", "unixsecs": 1643240937.040398, "mbps": 9953860.199973, "jitter_ms": 9.731}
+{"connection": "ok", "unixsecs": 1643240938.205079, "mbps": 9952486.757398, "jitter_ms": 9.73}
+{"connection": "ok", "unixsecs": 1643240939.369319, "mbps": 9952951.645435, "jitter_ms": 9.661}
+{"connection": "ok", "unixsecs": 1643240940.547966, "mbps": 9954346.570166, "jitter_ms": 9.888}
+{"connection": "ok", "unixsecs": 1643240941.721277, "mbps": 9954386.905438, "jitter_ms": 9.945}
+{"connection": "ok", "unixsecs": 1643240942.879624, "mbps": 9954296.744693, "jitter_ms": 9.547}
+{"connection": "ok", "unixsecs": 1643240944.044119, "mbps": 9953957.470209, "jitter_ms": 9.677}
+{"connection": "ok", "unixsecs": 1643240945.20501, "mbps": 9953499.604952, "jitter_ms": 10.049}
+{"connection": "ok", "unixsecs": 1643240946.371648, "mbps": 9954168.624338, "jitter_ms": 8.495}
+{"connection": "ok", "unixsecs": 1643240947.537633, "mbps": 9949342.787905, "jitter_ms": 9.349}
+{"connection": "ok", "unixsecs": 1643240948.700666, "mbps": 9953511.466215, "jitter_ms": 9.535}
+{"connection": "ok", "unixsecs": 1643240949.867539, "mbps": 9953770.048768, "jitter_ms": 10.294}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643240949, "jitter_ms": null}
+{"connection": "ok", "unixsecs": 1643240952.080179, "mbps": 9950189.045811, "jitter_ms": 9.267}
+{"connection": "ok", "unixsecs": 1643240953.260299, "mbps": 9949731.527163, "jitter_ms": 8.713}
+{"connection": "ok", "unixsecs": 1643240954.437494, "mbps": 9954405.886856, "jitter_ms": 9.718}
+{"connection": "ok", "unixsecs": 1643240955.610096, "mbps": 9953848.337879, "jitter_ms": 10.05}
+{"connection": "ok", "unixsecs": 1643240956.775087, "mbps": 9953969.332563, "jitter_ms": 10.917}
+{"connection": "ok", "unixsecs": 1643240957.934583, "mbps": 9953848.337879, "jitter_ms": 10.154}
+{"connection": "ok", "unixsecs": 1643240959.106835, "mbps": 9953122.43154, "jitter_ms": 10.013}
+{"connection": "ok", "unixsecs": 1643240960.289007, "mbps": 9953929.000675, "jitter_ms": 9.741}
+{"connection": "ok", "unixsecs": 1643240961.450648, "mbps": 9953798.517393, "jitter_ms": 9.943}
+{"connection": "ok", "unixsecs": 1643240962.612687, "mbps": 9953542.30563, "jitter_ms": 9.097}
+{"connection": "ok", "unixsecs": 1643240963.789502, "mbps": 9954237.429304, "jitter_ms": 9.218}
+{"connection": "ok", "unixsecs": 1643240964.973814, "mbps": 9953549.422446, "jitter_ms": 9.581}
+{"connection": "ok", "unixsecs": 1643240966.15419, "mbps": 9954237.429304, "jitter_ms": 9.06}
+{"connection": "ok", "unixsecs": 1643240967.331688, "mbps": 9954284.881558, "jitter_ms": 9.576}
+{"connection": "ok", "unixsecs": 1643240968.505027, "mbps": 9954106.937936, "jitter_ms": 9.904}
+{"connection": "ok", "unixsecs": 1643240969.674783, "mbps": 9953549.422446, "jitter_ms": 9.345}
+{"connection": "ok", "unixsecs": 1643240970.831456, "mbps": 9954159.134072, "jitter_ms": 10.461}
+{"connection": "ok", "unixsecs": 1643240972.005148, "mbps": 9953966.96009, "jitter_ms": 10.054}
+{"connection": "ok", "unixsecs": 1643240973.157032, "mbps": 9954087.957658, "jitter_ms": 10.154}
+{"connection": "ok", "unixsecs": 1643240974.319583, "mbps": 9953829.358587, "jitter_ms": 9.052}
+{"connection": "ok", "unixsecs": 1643240975.490857, "mbps": 9953917.138417, "jitter_ms": 9.582}
+{"connection": "ok", "unixsecs": 1643240976.661623, "mbps": 9954218.448528, "jitter_ms": 9.14}
+{"connection": "ok", "unixsecs": 1643240977.820042, "mbps": 9954524.522356, "jitter_ms": 9.409}
+{"connection": "ok", "unixsecs": 1643240978.991915, "mbps": 9954128.290834, "jitter_ms": 10.086}
+{"connection": "ok", "unixsecs": 1643240980.188849, "mbps": 9953767.67639, "jitter_ms": 10.486}
+{"connection": "ok", "unixsecs": 1643240981.359174, "mbps": 9954216.075937, "jitter_ms": 9.967}
+{"connection": "ok", "unixsecs": 1643240982.528426, "mbps": 9954057.114861, "jitter_ms": 9.576}
+{"connection": "ok", "unixsecs": 1643240983.700775, "mbps": 9953857.827552, "jitter_ms": 8.864}
+{"connection": "ok", "unixsecs": 1643241336.443566, "mbps": 9954059.487377, "jitter_ms": 5.888}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241336, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241337, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241338, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241339, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241340, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241341, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241342, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241343, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241344, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241345, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241347, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241348, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241349, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241350, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241351, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241352, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241353, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241354, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241355, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241356, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241357, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241358, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241359, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241360, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241361, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241362, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241364, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241365, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241366, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241367, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241368, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241369, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241370, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241371, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241372, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241373, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241374, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241375, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241376, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241377, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241378, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241379, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241381, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241382, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241383, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241384, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241385, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241386, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241387, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241388, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241389, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241390, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241391, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241392, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241393, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241394, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241395, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241396, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241398, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241399, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241400, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241401, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241402, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241403, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241404, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241405, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241406, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241407, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241408, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241409, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241410, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241411, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241412, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241414, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241415, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241416, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241417, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241418, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241419, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241420, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241421, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241422, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241423, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241424, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241425, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241426, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241427, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241428, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241429, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241431, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241432, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241433, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241434, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241435, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241436, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241437, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241438, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241439, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241440, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241441, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241442, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241443, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241444, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241445, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241446, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241448, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241449, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241450, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241451, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241452, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241453, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241454, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241455, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241456, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241457, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241458, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241459, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241460, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241461, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241462, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241464, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241465, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241466, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241467, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241468, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241469, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241470, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241471, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241472, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241473, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241474, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241475, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241476, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241477, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241478, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241480, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241481, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241482, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection timed out", "mbps": null, "unixsecs": 1643241612, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection timed out", "mbps": null, "unixsecs": 1643241743, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241745, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241746, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241747, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241748, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241749, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241750, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241751, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241752, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241753, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241755, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241756, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241757, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241758, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241759, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241760, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241761, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241762, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241763, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241764, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241765, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241766, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241767, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241768, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241769, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241770, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241772, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241773, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241774, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241775, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241776, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241777, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241778, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241779, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241780, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241781, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241782, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241783, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241784, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241785, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241787, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241788, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241789, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241790, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241791, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241792, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241793, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241794, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241795, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241796, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241797, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241798, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241799, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241800, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241801, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241802, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241804, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241805, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241806, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241807, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241808, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241809, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241810, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241811, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241812, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241813, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241814, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241815, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241816, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241817, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241818, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241820, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241821, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241822, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241823, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241824, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241825, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241826, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241827, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241828, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241829, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241830, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241831, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241832, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241833, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241834, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241835, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241836, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241838, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241839, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241840, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241841, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241842, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241843, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241844, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241845, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241846, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241847, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241848, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241849, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241850, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241851, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241852, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241854, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241855, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241856, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241857, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241858, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241859, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241860, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241861, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241862, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241863, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241864, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241865, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241866, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241867, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241868, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241869, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241871, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241872, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241873, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241874, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241875, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241876, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241877, "jitter_ms": null}
+{"connection": "unable to connect to server: Connection refused", "mbps": null, "unixsecs": 1643241878, "jitter_ms": null}

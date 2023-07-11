@@ -1,0 +1,21 @@
+[2022-03-11 11:54:24.037195] ---  Software Radio Systems LTE eNodeB  ---
+[2022-03-11 11:54:24.037233] 
+[2022-03-11 11:54:24.037243] Couldn't open , trying /root/.config/srsran/enb.conf
+[2022-03-11 11:54:24.037254] Reading configuration file /root/.config/srsran/enb.conf...
+[2022-03-11 11:54:24.037265] Couldn't open sib.conf, trying /root/.config/srsran/sib.conf
+[2022-03-11 11:54:24.037278] Couldn't open rr.conf, trying /root/.config/srsran/rr.conf
+[2022-03-11 11:54:24.037290] Couldn't open rb.conf, trying /root/.config/srsran/rb.conf
+[2022-03-11 11:54:24.060005] 
+[2022-03-11 11:54:24.060052] Built in Release mode using commit 25f494e4e on branch master.
+[2022-03-11 11:54:24.060059] 
+[2022-03-11 11:54:24.113148] Opening 1 channels in RF device=default with args=serial=319B6EC
+[2022-03-11 11:54:24.113195] Available RF device list: UHD  zmq 
+[2022-03-11 11:54:24.113207] Trying to open RF device 'UHD'
+[2022-03-11 11:54:24.642523] Opening USRP channels=1, args: serial=319B6EC,type=b200,master_clock_rate=23.04e6
+[2022-03-11 11:54:25.502649] RF device 'UHD' successfully opened
+[2022-03-11 11:54:27.421618] 
+[2022-03-11 11:54:27.421678] ==== eNodeB started ===
+[2022-03-11 11:54:27.421685] Type <t> to view trace
+[2022-03-11 11:54:27.421877] Setting frequency: DL=3510.0 Mhz, UL=3410.0 MHz for cc_idx=0 nof_prb=100
+[2022-03-11 11:54:27.424327] Enter t to stop trace.
+[2022-03-11 11:54:27.424364] Closing stdin thread.
