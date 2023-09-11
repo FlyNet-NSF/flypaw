@@ -460,7 +460,7 @@ class FlyPawBasestationAgent(object):
                                 thisResourceInfo.purpose = "mission" #get from mission somehow
                             
                                 m_ip = ("management", n.get_management_ip())
-                                e_ip = ("external", n.get_management_ip()) #for fabric these will not be the same 
+                                e_ip = ("external", n.get_external_ip()) #for fabric these will not be the same
                                 thisResourceInfo.resourceAddresses.append(m_ip)
                                 thisResourceInfo.resourceAddresses.append(e_ip)
                                 thisResourceInfo.state = n.get_reservation_state()
