@@ -17,6 +17,7 @@ resources:
         name_prefix: node
         network:
           type: IPv6 # Allowed values IPv4 or IPv6
+          local_nw_subnet: "192.168.1.0/24"
         flavor:
           cores: 2
           ram: 8
