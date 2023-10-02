@@ -20,7 +20,7 @@ import dronekit
 from geographiclib.geodesic import Geodesic
 #from distutils.util import strtobool
 from datetime import datetime
-from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, in_background, timed_state
+from aerpawlib.runner import BasicRunner, entrypoint, StateMachine, state, background, timed_state
 from aerpawlib.util import VectorNED, Coordinate 
 from aerpawlib.vehicle import Vehicle
 from aerpawlib.vehicle import Drone
