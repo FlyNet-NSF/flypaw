@@ -46,6 +46,9 @@ class FlyPawPilot(StateMachine):
         self.currentWaypointIndex = 0
         self.nextStates = []
         self.logfiles = {}
+        self.constantTelemetry = True #indicates a continuous periodic telemetry feed as opposed to one on waypoint entry
+        self.telemetryUpdateSeconds = 2 #the number of seconds between periodic telemetry updates if constantTelemetry = True
+        self.activated = False #activate after acceptance right before launch... triggers telemetry feed to start and whatever else
         self.videoLocation = "/root/video/video_diff_resolution/example1/video_1280_720.mpg"
         self.frameLocation = "/root/video/video_diff_resolution/example_frames"
         self.basestationIP = "172.16.0.1" #other side of the radio link
@@ -78,7 +81,57 @@ class FlyPawPilot(StateMachine):
         #errors
         error_file_name = output_directory + "error_%s.txt" % (current_timestring)
         self.logfiles['error'] = error_file_name
-                
+
+        
+    @background
+    async def streamTelemetry(self, drone: Drone):
+        '''
+        periodic background telemetry transmission to basestation  
+        enabled by constantTelemetry and activated booleans
+        sent every N seconds as determined by telemetryUpdateSeconds
+        '''
+        if self.constantTelemetry:
+            while True:
+                if self.activated:
+                    #update position and battery and gps and heading
+                    statusAttempts = 5
+                    statusAttempt = 0
+                    while True:
+                        print("get position.  Attempt: " + str(statusAttempt))
+                        self.currentPosition = getCurrentPosition(drone)
+                        if not checkPosition(self.currentPosition):
+                            if statusAttempt > statusAttempts:
+                                #GPS does not seem to be working... try to go home
+                                print("Can't query position.  Abort")
+                                with open(self.logfiles['error'], "a") as ofile:
+                                    ofile.write("Can't query position.  Abort")
+                                    ofile.close()
+                                    return "abortMission"
+                            else:
+                                statusAttempt = statusAttempt + 1
+                                await asyncio.sleep(1)
+                        else:
+                            print("position is communicating")
+                            statusAttempt = 0
+                            break
+
+                    #update heading, speed, and maybe attitude
+                    #self.currentAttitude = getCurrentAttitude(drone)
+                    self.currentHeading = drone.heading
+                    self.currentGroundspeed = drone._vehicle.groundspeed
+
+                    print ("report telemetry and battery status")
+                    recv = await self.reportPositionUDP()
+                    if (recv):
+                        print("report position to basestation confirmed")
+                        self.communications['reportPositionUDP'] = 1
+                    else:
+                        print("no reply from server while transmitting position")
+                        self.communications['reportPositionUDP'] = 0
+
+                #endless loop
+                await asyncio.sleep(self.telemetryUpdateSeconds)
+            
     #@entrypoint
     @state(name="preflight", first=True)
     async def preflight(self, drone=Drone):
@@ -373,15 +426,17 @@ class FlyPawPilot(StateMachine):
         self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][0])
         self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][1])
         self.nextWaypoint.append(self.missions[0].default_waypoints[self.currentWaypointIndex + 1][2])
-         
-        print ("report telemetry and battery status")
-        recv = await self.reportPositionUDP()
-        if (recv):
-            print("report position to basestation confirmed")
-            self.communications['reportPositionUDP'] = 1
-        else:
-            self.communications['reportPositionUDP'] = 0
-            print("no reply from server while transmitting position")
+
+        #if we're not sending telemetry periodically in the background, send it now
+        if not self.constantTelemetry:
+            print ("report telemetry and battery status")
+            recv = await self.reportPositionUDP()
+            if (recv):
+                print("report position to basestation confirmed")
+                self.communications['reportPositionUDP'] = 1
+            else:
+                self.communications['reportPositionUDP'] = 0
+                print("no reply from server while transmitting position")
        
         #check for mission actions to be performed at the start of this state
         #if the drone is the mission leader, or there's no comms to the basestation
@@ -885,6 +940,9 @@ class FlyPawPilot(StateMachine):
 
     
 def getMissions(basestationIP):
+    '''
+    returns a new mission from the basestation
+    '''
     x = uuid.uuid4()
     msg = {}
     msg['uuid'] = str(x)
@@ -900,6 +958,9 @@ def getMissions(basestationIP):
     return None
 
 def getResourceInfo(basestationIP):
+    '''
+    returns a list of your external resources in the resourceInfo class
+    '''
     x = uuid.uuid4()
     msg = {}
     msg['uuid'] = str(x)
@@ -914,44 +975,11 @@ def getResourceInfo(basestationIP):
                 resources = serverReply['resources']
                 return resources
     return None
-
-def configureResources(missionLibraries, resource):
-    #install any libraries needed for mission
-    x = uuid.uuid4()
-    msg = {}
-    msg['uuid'] = str(x)
-    msg['type'] = "configureResources"
-    msg['missionLibraries']= missionLibraries
-    msg['resource'] = resource
-    
-    #wait up to 5 minutes to let resources configure
-    serverReply = udpClientMsg(msg, basestationIP, 20001, 300)
-    if serverReply is not None:
-        print(serverReply['uuid_received'])
-        if serverReply['uuid_received'] == str(x):
-            if 'configured' in serverReply:
-                if serverReply['configured'] == True:
-                    return
-                else:
-                    with open(self.logfiles['error'], "a") as ofile:
-                        ofile.write("Error configuring resources. Try again later.")
-                        ofile.close()
-                        deleteResources(resources)
-                        return "preflight"
-            else:
-                with open(self.logfiles['error'], "a") as ofile:
-                        ofile.write("Error configuring resources. Try again later.")
-                        ofile.close()
-                        deleteResources(resources)
-                        return "preflight"                        
-    else:
-        with open(self.logfiles['error'], "a") as ofile:
-            ofile.write("Error configuring resources. Try again later.")
-            ofile.close()
-            deleteResources(resources)
-            return "preflight"
                     
 def getCurrentPosition(drone: Drone):
+    '''
+    get the position of the drone
+    '''
     if drone.connected:
         pos = drone.position
         gps = drone.gps
@@ -967,6 +995,9 @@ def getCurrentPosition(drone: Drone):
         return None
 
 def getCurrentBattery(drone: Drone):
+    '''
+    get the battery state of the drone
+    '''
     if drone.connected:
         battery = drone.battery
         thisBattery = Battery()
@@ -977,28 +1008,35 @@ def getCurrentBattery(drone: Drone):
     else:
         return None
 
-#def getCurrentAttitude(vehicle: Vehicle):
-    #function does not work
-    #Vehicle in aerpawlib needs to be updated
+def getCurrentAttitude(vehicle: Vehicle):
+    '''
+    get the attitude of the drone
+    '''
+    #not currently working
     #    if drone.connected:
-#        attitude = drone.Attitude
-#        currentAttitude = {}
-#        currentAttitude['pitch'] = attitude[0]
-#        currentAttitude['yaw'] = attitude[1]
-#        currentAttitude['roll'] = attitude[2]
-#        return currentAttitude
-#    else:
-#        return None
+    #        attitude = drone.Attitude
+    #        currentAttitude = {}
+    #        currentAttitude['pitch'] = attitude[0]
+    #        currentAttitude['yaw'] = attitude[1]
+    #        currentAttitude['roll'] = attitude[2]
+    #        return currentAttitude
+    #    else:
+    return None
 
 def getVideoLocation():
-    #check on the specific camera software configuration
-    #maybe add a camera argument
-    #or just hardcode for now:
+    '''
+    check on the specific camera software configuration
+    maybe add a camera argument
+    just hardcode for now as Aerpaw vehicles do not yet have a camera
+    '''
     videoLocation = "/opt/video/"
     return videoLocation
     
     
 def validateRequest(request):
+    '''
+    make sure any action the basestation is telling you to do is a known command
+    '''
     validReq = []
     validReq.append("iperf")
     validReq.append("waypoint_entry")
@@ -1014,9 +1052,12 @@ def validateRequest(request):
         return 0
 
 def checkPosition(thisPosition):
+    '''
+    a function to validate a reported position
+    '''
     #print(thisPosition.lat)
     #print(thisPosition.lon)
-    #sys.exit()
+    
     if thisPosition is None:
         print("position not available")
         return 0
@@ -1061,9 +1102,12 @@ def checkPosition(thisPosition):
     return 0
 
 def checkBattery(thisBattery, thisPosition, thisHome, destination):
-    """
-    destination: [lon,lat]
-    """
+    '''
+    a function to make sure the vehicle has enough battery to move to a position and still return home thereafter
+    this is a good idea, but without a good battery usage model, we can't do this correctly 
+    '''
+
+    #destination: [lon,lat]
     if destination is not None:
         #check the distance from the current location:                                                                                             
         geodesic_dx_a = Geodesic.WGS84.Inverse(thisPosition.lat, thisPosition.lon, destination[1], destination[0], 1025)
@@ -1091,21 +1135,22 @@ def checkBattery(thisBattery, thisPosition, thisHome, destination):
 
 def checkAirspace(theseWaypoints):
     """
-    checkAirspace
+    checkAirspace stub
     TBD-->check for UVRs, weather, gps, network outages
     """
     return 1
 
 def checkEquipment(thismission):
     """
-    checkEquipment
+    checkEquipment stub
     TBD-->status check for mission specific equipment, such as camera, anemometer, etc
     """
     return 1
 
 def checkCloudResources(thismission):
     """
-    checkCloudResources
+    checkCloudResources stub
+    Right now the basestation is handling this, though this could be an explicit check for such on the drone side
     TBD-->first, check to see if the mission object specifies any cloud resources
     if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
     """
@@ -1113,13 +1158,18 @@ def checkCloudResources(thismission):
 
 def checkEdgeResources(thismission):
     """      
-    checkCloudResources 
+    checkEdgeResources stub
+    We don't have any edge resources right now aside from the basestation... could check that if necessary
     TBD-->first, check to see if the mission object specifies any edge resources
     if so, check them with some status routine... not necessarily reserve them, but inquire if they are reservable
     """
     return 1
 
 def acceptMission(basestationIP, thismission):
+    '''
+    this function accepts the mission given to the drone
+    upon acceptance the basestation registers the flight and may spin up cloud resources so we allow up to 20 minutes for a response that we are ready for launch
+    '''
     x = uuid.uuid4()
     msg = {}
     msg['uuid'] = str(x)
@@ -1142,6 +1192,9 @@ def acceptMission(basestationIP, thismission):
     return 0
 
 def getEntryMissionActions(missiontype):
+    '''
+    these are things we do upon arrival at a waypoint, if any
+    '''
     mission_actions = []
     if missiontype == "bandwidth":
         mission_actions.append('iperf')
@@ -1155,6 +1208,9 @@ def getEntryMissionActions(missiontype):
     return mission_actions
 
 def logState(logfile, state):
+    '''
+    this dumps the current state machine state into a file to record the state transitions
+    '''
     now_rfc3339 = datetime.now().astimezone().isoformat()
     simpleStateJSON = {'time': now_rfc3339, 'state': state }
     result_str = json.dumps(simpleStateJSON)
@@ -1165,6 +1221,9 @@ def logState(logfile, state):
         ofile.close()
         
 def udpClientMsg(msg, address, port, timeout_in_seconds):
+    ''' 
+    a udp socket message wrapper with a pre defined max wait time for a response
+    '''
     try:
         serialMsg = pickle.dumps(msg)
         serverLoc = (address, port)
@@ -1196,6 +1255,9 @@ def udpClientMsg(msg, address, port, timeout_in_seconds):
         return None
 
 def udpFileSend(filename, address, port, buffersz):
+    '''
+    a udp socket wrapper for file transfer
+    '''
     #buffersz could be 1024 or 4096... not sure the best value 
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -1227,6 +1289,9 @@ def udpFileSend(filename, address, port, buffersz):
     return 0
 
 def prometheusStatusQuery(prometheusURL):
+    '''
+    a wrapper to query a prometheus server for status info to make sure cloud or edge resources are online
+    '''
     response = requests.get(prometheusURL, verify=False, timeout=3)
     online = False
     if response.status_code == 200:
@@ -1262,6 +1327,9 @@ def prometheusStatusQuery(prometheusURL):
     return online
 
 def prometheusLoadQuery(prometheusURL):
+    '''
+    a wrapper to query a prometheus server for load info on resources as a precursor to do explicit load balancing
+    '''
     response = requests.get(prometheusURL, verify=False, timeout=3)
     if response.status_code == 200:
         print ("load query result: " + response.text)
