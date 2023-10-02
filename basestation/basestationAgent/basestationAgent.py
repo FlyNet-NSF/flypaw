@@ -7,222 +7,19 @@ import sys
 import pytz
 import requests
 import time
+from datetime import datetime
 from mobius.controller.controller import Controller
-
 from flypawClasses import iperfInfo, sendVideoInfo, sendFrameInfo, collectVideoInfo, flightInfo, missionInfo, resourceInfo, VehicleCommands, droneSim
-
-#from cloud_resources import CloudResources
+from prometheusInterface import configurePrometheusForResources
+from missionDefinition import configureBasestationProcesses, getMissionLibraries, getMissionResourcesCommands, getMissionCompletionCommands, 
+from flightPlanning import getPlanFromPlanfile, processPlan
+from acsInterface import registerACS, updateACS
 
 #sys.path.append('/root/Profiles/vehicle_control/aerpawlib/')
 #from aerpawlib.util import Coordinate
 #from aerpawlib.vehicle import Drone
 #from aerpawlib.vehicle import Vehicle
 #import dronekit
-
-#import aerpawlib
-from datetime import datetime
-
-def configurePrometheusForResources(resources):
-    prometheusReloadURL = "http://127.0.0.1:9090/-/reload"
-    prometheus_config_array = []
-    prometheus_config_obj = {}
-    resource_ip_array = []
-    for resource in resources:
-        thisResourceInfo = resource.__dict__
-        resourceAddresses = thisResourceInfo['resourceAddresses']
-        externalIP = resourceAddresses[1][1]
-        externalIPandPort = externalIP + ":8095"
-        if externalIPandPort not in resource_ip_array:
-            resource_ip_array.append(externalIPandPort)
-        
-    prometheus_config_obj['labels'] = {}
-    prometheus_config_obj['labels']['job'] = "node"
-    prometheus_config_obj['targets'] = resource_ip_array
-    prometheus_config_array.append(prometheus_config_obj)
-    try:
-        with open("/root/prometheus/targets.json", "w") as ofile:
-            json.dump(prometheus_config_array,ofile)
-            ofile.close()
-    except IOError:
-        print("could not open prometheus config file")
-        return 1
-    #tell prometheus to reload config
-    time.sleep(1)
-    updateresp = requests.post(prometheusReloadURL, data={})
-    if updateresp.status_code == 200:
-        print("Prometheus configured and reloaded")
-    else:
-        print("Prometheus reload failed with status_code: " + str(status_code))
-        return 1
-    return 0
-
-def configureBasestationProcesses(mission, resources):
-    thisMission = mission.__dict__
-    if 'missionType' in thisMission:
-        missiontype = thisMission['missionType']
-        if missiontype == "videography":
-            #videography mission uses prometheus... configure and run
-            prometheusFail = configurePrometheusForResources(resources)
-            if (prometheusFail):
-                return 1
-        elif missiontype == "bandwidth":
-            #could theoretically start iperf server, but punt for now
-            return 1
-        elif missiontype == "fire":
-            #maybe start the udp video frame transfer server?
-            #could theoretically start iperf server
-            return 1
-    return 0
-
-                
-def getMissionLibraries(mission, resources):
-    thisMission = mission.__dict__
-    if 'missionType' in thisMission:
-        missiontype = thisMission['missionType']
-        missionLibraries = []
-        if missiontype == "bandwidth":
-            for thisResource in resources: #same libraries for each resource in this case
-                resourceLibraries = []
-                resourceLibraries.append("iperf3")
-                missionLibraries.append(resourceLibraries)
-        elif missiontype == "videography":
-            for thisResource in resources: #same libraries for each resource in this case
-                resourceLibraries = []
-                resourceLibraries.append("iperf3")
-                resourceLibraries.append("epel-release")
-                resourceLibraries.append("docker")
-                missionLibraries.append(resourceLibraries)
-        return missionLibraries
-    else:
-        return None
-
-def getMissionCompletionCommands(mission, resources):
-    #stub... unfinished
-    thisMission = mission.__dict__
-
-    if 'missionType' in thisMission:
-        missiontype = thisMission['missionType']
-        missionCompletionCommands = [] #one list of commands per resource
-        if missiontype == "bandwidth":
-            for thisResource in resources:
-                thisResourceInfo = thisResource.__dict__
-                #a list of commands for each resource
-                completionCommands = []
-                missionCompletionCommands.append(completionCommands)
-        elif missiontype == "videography":
-            for thisResource in resources:
-                thisResourceInfo = thisResource.__dict__
-                #a list of commands for each resource
-                completionCommands = []
-                missionCompletionCommands.append(completionCommands)
-        return missionCompletionCommands
-
-def getMissionResourcesCommands(mission, resources):
-    thisMission = mission.__dict__
-    
-    if 'missionType' in thisMission:
-        missiontype = thisMission['missionType']
-        missionResourcesCommands = [] #one list of commands per resource
-        if missiontype == "bandwidth":
-            for thisResource in resources:
-                thisResourceInfo = thisResource.__dict__
-                missionResourceCommands = []
-                #open up the ports... maybe there is a more precise way to do this
-                missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
-                #run iperf3
-                missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
-                missionResourcesCommands.append(missionResourceCommands)
-        elif missiontype == "videography":
-            for thisResource in resources:
-                thisResourceInfo = thisResource.__dict__
-                resourceAddresses = thisResourceInfo['resourceAddresses']
-                #generally address 0 is management IP, address 1 external IP...they could be the same
-                #resourceAddress is a pair eg. ['external', 'xxx.xxx.xxx.xxx']
-                #could cycle through each address and look for external as first part of pair rather than just assume
-                externalIP = resourceAddresses[1][1]
-                missionResourceCommands = []
-                #open up the ports... maybe there is a more precise way to do this
-                missionResourceCommands.append("sudo iptables -P INPUT ACCEPT")
-                #run iperf3
-                missionResourceCommands.append("iperf3 --server -J -D --logfile /home/cc/iperf3.txt")
-                #start docker
-                missionResourceCommands.append("sudo systemctl start docker")
-                #get prometheus node exporter 
-                missionResourceCommands.append("wget https://github.com/prometheus/node_exporter/releases/download/v1.0.0-rc.0/node_exporter-1.0.0-rc.0.linux-amd64.tar.gz")
-                #untar prometheus node exporter
-                missionResourceCommands.append("sudo tar -zxvf node_exporter-1.0.0-rc.0.linux-amd64.tar.gz -C /opt")
-                #run prometheus node exporter
-                missionResourceCommands.append("nohup /opt/node_exporter-1.0.0-rc.0.linux-amd64/node_exporter --web.listen-address=':8095' > /home/cc/node_exporter.log 2>&1 &")
-                #get darknet container
-                missionResourceCommands.append("sudo docker pull papajim/detectionmodule")
-                #clone coconet github
-                missionResourceCommands.append("git clone https://github.com/papajim/pegasus-coconet.git")
-                #make directory for incoming images
-                missionResourceCommands.append("mkdir /home/cc/dataset");
-                #get receive_file_udp to receive image files and run darknet
-                missionResourceCommands.append("wget https://emmy8.casa.umass.edu/flypaw/cloud/receive_file_udp/receive_file_udp_send_coconet.py")
-                #run receive_file_udp
-                missionResourceCommands.append("nohup python3 receive_file_udp_send_coconet.py -o /home/cc/dataset -a '0.0.0.0' -p 8096 -b 4096 > /home/cc/receive_file_udp.log 2>&1 &")
-
-                missionResourcesCommands.append(missionResourceCommands)
-                #install ffmpeg for now... centos 7 requires the repo install
-                #missionResourceCommands.append("sudo yum -y localinstall --nogpgcheck https://download1.rpmfusion.org/free/el/rpmfusion-free-release-7.noarch.rpm")
-                #missionResourceCommands.append("sudo yum -y install ffmpeg");
-                #missionResourceCommands.append("mkdir /home/cc/ffmpeg");
-                #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -c copy -flags +global_header -f segment -segment_time 10 -segment_format_options movflags=+faststart -reset_timestamps 1 /home/cc/ffmpeg/test%d.mp4 > /home/cc/ffmpeg/ffmpeg.log 2>&1 < /dev/null &"
-                #ffmpeg_cmd = "ffmpeg -nostdin -i udp://" + externalIP + ":23000 -f mpegts udp://" + externalIP + ":24000"
-                #missionResourceCommands.append(ffmpeg_cmd)
-                
-        return missionResourcesCommands
-    else:
-        return None
-def getPlanFromPlanfile(filepath):
-    f = open(filepath)
-    pathdata = json.load(f)
-    f.close()
-    return pathdata
-
-def processPlan(plan):
-    processedPlan = {}
-    default_waypoints = []
-    if not 'mission' in plan:
-        print("No mission in planfile")
-        return None
-    if not 'plannedHomePosition' in plan['mission']:
-        print("No planned home position")
-        return None
-    php = plan['mission']['plannedHomePosition']
-
-    thisWaypoint = [php[1],php[0],0]
-    default_waypoints.append(thisWaypoint)
-    lastWaypoint = thisWaypoint
-    if not 'items' in plan['mission']:
-        print("No items")
-        return None
-    theseItems = plan['mission']['items']
-    for thisItem in theseItems:
-        if 'autocontinue' in thisItem:
-            if thisItem['autocontinue'] == True:
-                print ("ignore autocontinue")
-                thisWaypoint = [php[1],php[0],lastWaypoint[2]]
-                processedPlan['default_waypoints'] = default_waypoints
-                thisWaypoint = [php[1],php[0],0]
-                default_waypoints.append(thisWaypoint)
-        if 'params' in thisItem:
-            if not len(thisItem['params']) == 7:
-                print("incorrect number of params")
-            else:
-                thisWaypoint = [thisItem['params'][5], thisItem['params'][4], thisItem['params'][6]]
-                if thisWaypoint[0] == 0:
-                    thisWaypoint[0] = lastWaypoint[0]
-                if thisWaypoint[1] == 0:
-                    thisWaypoint[1] = lastWaypoint[1]
-                default_waypoints.append(thisWaypoint)
-                lastWaypoint = thisWaypoint
-
-    print (default_waypoints)
-    processedPlan['default_waypoints'] = default_waypoints
-    return processedPlan
 
 class FlyPawBasestationAgent(object):
     def __init__(self, ipaddr="172.16.0.1", port=20001, chunkSize=1024) :
@@ -238,7 +35,6 @@ class FlyPawBasestationAgent(object):
         self.currentRequests = []
         self.iperfHistory = []
         self.resourceList = []
-        #self.drone = Drone() #our digital twin
         self.droneSim = droneSim()
         self.vehicleCommands = VehicleCommands()
         self.vehicleCommands.setIperfCommand(self.iperf3Agent)
@@ -266,12 +62,6 @@ class FlyPawBasestationAgent(object):
             self.cloud_mgr = Controller(config_file_location="./config.yml")
         else:
             self.cloud_mgr = None
-            
-    def update_digital_twin(self):
-        """
-        function call to update the digital twin with different types of incoming data   
-        """
-        return
     
     def handle_telemetry(self, msg):
         """
@@ -297,10 +87,10 @@ class FlyPawBasestationAgent(object):
         if self.missions[0].resources:
             #only do this if we have an outside connection
             #self.update_digital_twin(msg)
-            acsUpdate = self.update_acs()
+            acsUpdate = self.updateACS(self.droneSim, mission.name, self.updateURL, self.usrname, self.password)
             print(acsUpdate)
 
-        #set command based on mission                                                                                                                                          
+        #set command based on mission
         if self.missions[0].missionType == "Bandwidth":
             print("received telemetry, asking for iperf")
             self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
@@ -310,102 +100,12 @@ class FlyPawBasestationAgent(object):
             self.currentRequests.append(self.vehicleCommands.commands['iperf']) # iperf as default
             
         return
-
-    def register_acs(self):
-        #register in ACS  (once it's working move it down below the get resources
-        """                                                                      
-        ACS registration                                                                                                                                                    
-        """
-        print("register in ACS")
-        
-        lineString = gj.LineString(self.missions[0].default_waypoints)
-        userProperties = {}
-        featureList = []
-        userProperties['classification'] = "scheduledFlight";
-        eventName = self.missions[0].name
-        #utcnow = datetime.utcnow()                                                                                                                                         
-        #startTime = utcnow.isoformat(sep='T')                                                                                                                              
-        currentUnixsecs = datetime.now(tz=pytz.UTC).timestamp()
-        laterUnixsecs = currentUnixsecs + 1800 #half an hour from now                                                                                                       
-        currentDT = datetime.fromtimestamp(currentUnixsecs, tz=pytz.UTC)
-        laterDT = datetime.fromtimestamp(laterUnixsecs, tz=pytz.UTC)
-        startTime = currentDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-        endTime = laterDT.strftime("%Y-%m-%dT%H:%M:%S+00:00")
-        
-        feature = gj.Feature(geometry=lineString, properties={"eventName": eventName, "startTime": startTime, "endTime": endTime, "userProperties": userProperties, "products": [{"hazard": "MRMS_PRECIP", "parameters": [{"thresholdUnits": "inph", "comparison": ">=", "distance": 5, "distanceUnits": "miles", "threshold": 0.1}]}]})
-        featureList.append(feature)
-        fc = gj.FeatureCollection(featureList)
-        dumpFC = gj.dumps(fc, sort_keys=True)
-        FC_data = {'json': dumpFC}
-        flightsubmitresp = requests.post(self.acs, auth=(self.usrname, self.password), data=FC_data)
-        registerResp = {}
-        registerResp['registrationStatusCode'] = flightsubmitresp.status_code
-        print(flightsubmitresp.status_code)
-        if flightsubmitresp.status_code == 200:
-            registerResp['registration'] = "OK"
-            print(json.dumps(registerResp))
-            return True
-        else:
-            print("could not register flight in ACS")
-            registerResp['registration'] = "FAILED"
-            print(json.dumps(registerResp))
-            return False
-        
-    def update_acs(self):
-        postData = {}
-        postData['type'] = 'Feature'
-        
-        geometry = {}
-        geometry['type'] = 'Point'
-
-        currentLocation = []
-        currentLocation.append(self.droneSim.position.lon)
-        currentLocation.append(self.droneSim.position.lat)
-        currentLocation.append(self.droneSim.position.alt)
-
-        geometry['coordinates'] = currentLocation
-        #geometry['coordinates'] = self.droneSim.position
-        postData['geometry'] = geometry
-        
-        properties = {}
-        #just use the first mission name for now
-        properties['eventName'] = self.missions[0].name
-        properties['locationTimestamp'] = self.droneSim.position.time
-        
-        nextWP = {}
-        nextWPGeo = {}
-        nextWPGeo['type'] = 'Point'
-        #nextWaypoint = []
-        #nextWaypoint.append(self.droneSim.nextWaypoint.lon)
-	#nextWaypoint.append(self.droneSim.nextWaypoint.lat)
-	#nextWaypoint.append(self.droneSim.nextWaypoint.alt)
-        #nextWPGeo['coordinates'] = nextWaypoint
-        nextWPGeo['coordinates'] = []
-        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[0])
-        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[1])
-        nextWPGeo['coordinates'].append(self.droneSim.nextWaypoint[2])
-        
-        nextWP['geometry'] = nextWPGeo
-        nextWP['type'] = 'Feature'
-        properties['nextWaypoint'] = nextWP        
-        properties['userProperties'] = {}
-        properties['userProperties']['heading'] = self.droneSim.heading
-        postData['properties'] = properties
-        post_json_data = json.dumps(postData)
-
-        postParameters = {}
-        postParameters['json'] = post_json_data
-        flightupdateresp = requests.post(self.updateURL, auth=(self.usrname, self.password), data=postParameters)
-        updateResp = {}
-        updateResp['registrationStatusCode'] = flightupdateresp.status_code
-        #print(flightsubmitresp.status_code)
-        if flightupdateresp.status_code == 200:
-            updateResp['registration'] = "OK"
-        else:
-            updateResp['registration'] = "FAILED"
-        return updateResp['registration']
             
     def basestationDispatch(self):
+        '''
+        basestationDispatch is a udp based listening socket that the drone uses as a mission managing agent
+        for example... drone->requests mission basestationDispatch-> provides mission  etc.   
+        '''
         UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         UDPServerSocket.bind((self.ipaddr, self.port))
         print("UDP server up and listening")
@@ -437,30 +137,31 @@ class FlyPawBasestationAgent(object):
                 elif msgType == "acceptMission":
                     #if you have an outside connection only
                     if self.missions[0].resources:
-                        #register in ACS  (once it's working move it down below the get resources
-                        
                         """
                         ACS registration
                         """
-                        registered = self.register_acs()
+                        registered = self.registerACS(mission.default_waypoints, mission.name, self.acs, self.usrname, self.password)
                         if not registered:
                             msgFromServer['missionstatus'] = "canceled"
                             return
                     
                         #if we're registered properly...
+
                         #get cloud resources and configure to mission
                         self.cloud_mgr.create()
                         time.sleep(3)
+                        
                         slices = self.cloud_mgr.get_resources()
                         for s in slices:
                             for n in s.get_nodes():
                                 thisResourceInfo = resourceInfo()
                                 thisResourceInfo.name = n.get_name()
-                                thisResourceInfo.location = "KVM@TACC" #extract algorithmically
-                                thisResourceInfo.purpose = "mission" #get from mission somehow
-                            
+                                thisResourceInfo.location = "KVM@TACC" #todo: extract algorithmically
+                                thisResourceInfo.purpose = "mission" #todo: get dynamically from mission
+
+                                #get the relevant IP addresses
                                 m_ip = ("management", n.get_management_ip())
-                                e_ip = ("external", n.get_external_ip()) #for fabric these will not be the same
+                                e_ip = ("external", n.get_external_ip()) 
                                 thisResourceInfo.resourceAddresses.append(m_ip)
                                 thisResourceInfo.resourceAddresses.append(e_ip)
                                 thisResourceInfo.state = n.get_reservation_state()
@@ -468,9 +169,10 @@ class FlyPawBasestationAgent(object):
                         print("giving resources 60 seconds to come online")
                         time.sleep(60)
 
-                    # Now that you have the IP addresses, configure anything on the basestation
+                    # Now that you have the resource IP addresses, configure anything you need to on the basestation
                     fail = configureBasestationProcesses(self.missions[0],self.resourceList)
                     if (fail):
+                        #if your basestation configuration fails, cancel the mission and release the resources
                         msgFromServer['missionstatus'] = "canceled"
 
                         if self.missions[0].resources:
@@ -482,7 +184,7 @@ class FlyPawBasestationAgent(object):
                             return
                     
                     if self.missions[0].resources:
-                        # now configure nodes...
+                        # now configure resource nodes
                         """
                         Mission Library Installation on Cloud Nodes
                         """
@@ -493,18 +195,6 @@ class FlyPawBasestationAgent(object):
                             for node in s.get_nodes():
                                 nodeName = node.get_name()
                                 print("Install Libraries for nodeName: " + nodeName)
-                                #getRepoStr = "wget 'http://mirror.centos.org/centos/8-stream/BaseOS/x86_64/os/Packages/centos-gpg-keys-8-3.el8.noarch.rpm'"
-                                #installRepoStr = "sudo rpm -i 'centos-gpg-keys-8-3.el8.noarch.rpm'"
-                                #swapRepoStr = "sudo dnf -y --disablerepo '*' --enablerepo=extras swap centos-linux-repos centos-stream-repos"
-                                #stdout, stderr = node.execute(getRepoStr)
-                                #print(stdout)
-                                #print(stderr)
-                                #stdout, stderr = node.execute(installRepoStr)
-                                #print(stdout)
-                                #print(stderr)
-                                #stdout, stderr = node.execute(swapRepoStr)
-                                #print(stdout)
-                                #print(stderr)
                                 for library in missionLibraries[nodeno]:
                                     #libraryInstallStr = "sudo dnf -y install " + library #centos8 
                                     libraryInstallStr = "sudo yum -y install " + library #centos7
@@ -564,7 +254,7 @@ class FlyPawBasestationAgent(object):
                 elif msgType == "abortMission":
                     print ("mission abort... prepare for landing")
                 elif msgType == "completed":
-                    #download your log files from the cloud
+                    #todo migrate to getMissionCompletionCommands
                     #missionCompletionCommands = getMissionCompletionCommands(self.missions[0],self.resourceList)
                     if self.missions[0].resources:
                         for s in slices:
@@ -572,23 +262,16 @@ class FlyPawBasestationAgent(object):
                             for node in s.get_nodes():
                                 nodeName = node.get_name()
                                 print("Run Commands for nodeName: " + nodeName)
+                                #download your log files from the cloud
                                 logTime = datetime.now().astimezone().isoformat()
                                 iperfLogfile = "/root/Results/" + nodeName + "_iperf_" + str(logTime) + ".log"
                                 node.download_file(iperfLogfile, "/home/cc/iperf3.txt", retry=3, retry_interval=5)
                                 darknetLogfile = "/root/Results/" + nodeName + "_darknet_" + str(logTime) + ".log"
                                 node.download_file(darknetLogfile, "/home/cc/darknet.log", retry=3, retry_interval=5)
-                            
-                                #for command in missionResourcesCommands[nodeno]:
-                                #    print("command: " + command)
-                                #    stdout, stderr = node.execute(command)
-		                #    print(stdout)
-                                #    print(stderr)
-                                #nodeno = nodeno + 1
+                                #delete resource
                                 print("Deleting: " + nodeName)
                                 nodeDelete = node.delete()
 
-                                # delete the cloud resources
-                                #self.cloud_mgr.delete()
                     print("flight complete")
                     sys.exit()
                 else:
