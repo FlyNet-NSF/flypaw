@@ -45,7 +45,8 @@ class FlyPawBasestationAgent(object):
         self.usrname = "admin"
         self.password = "shabiz"
         self.updateURL = "https://casa-denton3.noaa.unt.edu:8091/casaAlert/flightUpdate"
-        #for mission data, we should probably be checking elsewhere... for now we'll just define a mission here:
+
+        #for now we'll statically define a mission here:
         mission = missionInfo()
         mission.name = "AERPAW"
         mission.missionType = "fire" #"bandwidth", "videography", "fire"
@@ -58,6 +59,8 @@ class FlyPawBasestationAgent(object):
         mission.default_waypoints = processedPlan['default_waypoints']
         mission.resources = False
         self.missions.append(mission)
+
+        #if you want external (ie. Fabric or Chameleon) resources, set mission.resources to true and update config.yml
         if mission.resources:
             self.cloud_mgr = Controller(config_file_location="./config.yml")
         else:
